@@ -1,0 +1,13 @@
+env/
+__pycache__/
+*.pyc
+cache/
+processed/
+raw_gpx/
+dist/
+build/
+TripManager_release.zip
+TripManager.spec
+komoot_credentials.json
+.claude/
+.vs/

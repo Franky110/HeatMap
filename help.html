@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Trip Manager - Help</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body {
+    font-family: sans-serif;
+    line-height: 1.5;
+    color: #222;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px 24px 60px;
+  }
+  h1 { border-bottom: 2px solid #1976d2; padding-bottom: 8px; }
+  h2 {
+    margin-top: 36px;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 4px;
+    color: #1976d2;
+  }
+  h3 { margin-top: 22px; }
+  code, .key {
+    background: #f0f0f0;
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-family: Consolas, monospace;
+    font-size: 0.95em;
+  }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+  th, td {
+    border: 1px solid #ddd;
+    padding: 6px 10px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { background: #f5f5f5; }
+  .note {
+    background: #fff8e1;
+    border-left: 4px solid #fbc02d;
+    padding: 8px 12px;
+    margin: 10px 0;
+  }
+  .toc { background: #f5f5f5; border-radius: 6px; padding: 12px 20px; }
+  .toc ul { margin: 4px 0; }
+  a { color: #1976d2; }
+  .back-to-top { font-size: 0.85em; }
+</style>
+</head>
+<body>
+
+<h1>Trip Manager - Help</h1>
+
+<p>
+  Trip Manager imports your recorded trips (from GPX files, Komoot, Strava or
+  Garmin Connect) and displays them as a combined heatmap, showing which
+  routes you travel most often. Routes used many times appear brighter because
+  multiple overlapping lines stack on top of each other. Click anywhere on the
+  map to find all the trips that passed through that spot.
+</p>
+
+<div class="toc">
+  <strong>Contents</strong>
+  <ul>
+    <li><a href="#install">0. Installation</a></li>
+    <li><a href="#import">1. Importing data</a></li>
+    <li><a href="#process">2. Processing your trips</a></li>
+    <li><a href="#options">3. Processing options explained</a></li>
+    <li><a href="#viewing">4. Viewing the heatmap</a></li>
+    <li><a href="#map-options">5. Heatmap page options</a></li>
+    <li><a href="#dashboard">6. The trip dashboard</a></li>
+    <li><a href="#data-folder">7. Where your data is stored</a></li>
+  </ul>
+</div>
+
+<h2 id="install">0. Installation</h2>
+
+<p>
+  Trip Manager is a set of files you can copy anywhere on your computer
+  (e.g. a folder on your Desktop) — there is no traditional installer.
+</p>
+<ol>
+  <li>
+    Double-click <strong>setup.bat</strong>. The first time it runs, it will:
+    <ul>
+      <li>check whether Python is installed, and if not, try to install it
+          (or open the download page so you can install it manually — during
+          install, make sure "Add python.exe to PATH" is checked);</li>
+      <li>create a private <code>env</code> folder with the packages Trip
+          Manager needs, without affecting any other Python on your computer.</li>
+    </ul>
+    If it tells you Python was just installed, close the window and run
+    <strong>setup.bat</strong> again.
+  </li>
+  <li>
+    Once setup finishes, double-click <strong>Trip Manager.bat</strong> to
+    start the program. You can create a shortcut to this file on your
+    Desktop for convenience.
+  </li>
+</ol>
+<div class="note">
+  Setup only needs to be run once (or again after updating Trip Manager to a
+  new version). After that, just use <strong>Trip Manager.bat</strong> to launch it.
+</div>
+
+<h2 id="import">1. Importing data</h2>
+
+<p>Trip Manager works with GPX files. There are several ways to get them:</p>
+
+<h3>Import from Komoot / Strava / Garmin Connect</h3>
+<p>
+  Use the import buttons in the top-left of the window. The first time you use
+  a service you'll be asked for your login credentials. For Komoot these are
+  stored encrypted on your computer and won't be asked again on the same PC.
+</p>
+
+<h3>Add files manually</h3>
+<table>
+  <tr><th>Button</th><th>What it does</th></tr>
+  <tr><td><strong>Add files...</strong></td><td>Pick one or more <code>.gpx</code> files to add.</td></tr>
+  <tr><td><strong>Add folder...</strong></td><td>Pick a folder; every <code>.gpx</code> file inside it is added.</td></tr>
+  <tr><td><strong>Remove selected</strong></td><td>Removes the highlighted trip(s) and deletes the GPX file.</td></tr>
+  <tr><td><strong>Refresh</strong></td><td>Re-scans your data folder and reloads the trip list.</td></tr>
+</table>
+
+<h2 id="process">2. Processing your trips</h2>
+
+<p>
+  "Processing" reads each GPX file, decimates the GPS track to remove
+  near-duplicate points, and writes the result to the output folder so the
+  heatmap can display it. Processing is fast — a typical batch of trips takes
+  a few seconds.
+</p>
+<p>
+  Set any <a href="#options">processing options</a> you want, then click
+  <strong>Run processing</strong>. A progress bar and log show what's happening.
+  When processing finishes, a dialog offers to open the visualization right away.
+</p>
+<div class="note">
+  Processing writes <code>raw_data.js</code> and a <code>trip_details/</code>
+  folder into the Output folder. The heatmap page reads these files.
+</div>
+
+<h2 id="options">3. Processing options explained</h2>
+
+<table>
+  <tr><th>Option</th><th>What it does</th></tr>
+  <tr>
+    <td><strong>Limit (0 = all)</strong></td>
+    <td>
+      Maximum number of trips to include, starting from the most recent.
+      Set to <code>0</code> to include every trip. Useful for a quick test
+      before processing your entire history.
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Start date</strong> / <strong>End date</strong></td>
+    <td>
+      Only include trips recorded between these dates (<code>YYYY-MM-DD</code>).
+      Leave blank for no limit on that side.
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Min distance (km)</strong></td>
+    <td>
+      Skip trips shorter than this distance — handy for filtering out accidental
+      short GPS traces.
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Sport</strong></td>
+    <td>
+      Only include trips of the selected sport (Bike, Run, Walking, etc.).
+      Choose <strong>All</strong> to include every sport.
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Only process new trips</strong></td>
+    <td>
+      When checked, trips already present in the output are skipped, and new
+      results are merged into the existing output. This is much faster than
+      reprocessing everything when you just want to add a few new trips.
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Output folder</strong></td>
+    <td>
+      Where the processed data is written. Defaults to the
+      <code>processed</code> folder inside your Trip Manager data folder.
+    </td>
+  </tr>
+</table>
+
+<h2 id="viewing">4. Viewing the heatmap</h2>
+
+<p>
+  Once you have processed at least one trip, click
+  <strong>Open visualization</strong>. This starts a small local web server
+  and opens the heatmap in your browser.
+</p>
+<p>
+  The map shows every trip as a solid line. Routes you have traveled many
+  times appear brighter because multiple semi-transparent lines overlap —
+  no preprocessing needed. The color of each line reflects its sport type.
+</p>
+
+<h2 id="map-options">5. Heatmap page options</h2>
+
+<table>
+  <tr><th>Control</th><th>What it does</th></tr>
+  <tr>
+    <td><strong>Select data folder...</strong></td>
+    <td>
+      Loads data from a different folder — for example, one someone else
+      shared with you. The label below shows which folder is currently loaded.
+    </td>
+  </tr>
+  <tr>
+    <td><strong>GPS tracks</strong> (checkbox + Width / Opacity sliders)</td>
+    <td>
+      Shows or hides all trip lines. Width controls line thickness; Opacity
+      controls how transparent each individual line is. Lower opacity makes
+      overlapping routes stand out more clearly.
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Sport type</strong> filters</td>
+    <td>
+      One checkbox per sport found in your data. Untick a sport to hide those
+      trips. Click the color swatch to change the color used on the map.
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Click radius</strong></td>
+    <td>
+      The search radius (in metres) used when you click the map. All trips
+      that have a GPS point within this radius of your click are listed in
+      the sidebar.
+    </td>
+  </tr>
+</table>
+
+<h3>Clicking the map</h3>
+<p>
+  Click anywhere on the map. A translucent circle shows the search area, and
+  the sidebar lists every trip whose GPS track passes within that radius.
+  The header shows the count: "X trips within 50 m". Click any trip in the
+  list to open its <a href="#dashboard">dashboard</a>.
+</p>
+
+<h2 id="dashboard">6. The trip dashboard</h2>
+
+<p>
+  Clicking a trip in the sidebar opens the dashboard at the bottom of the
+  screen, showing elevation and speed profiles for that trip, and highlights
+  the route faintly on the map. The speed axis is scaled to the sport type
+  (e.g. tighter for Running than for Biking). GPS noise spikes are filtered
+  automatically with a 5-point median smoother.
+</p>
+
+<table>
+  <tr><th>Control</th><th>What it does</th></tr>
+  <tr>
+    <td><strong>X: Distance / Time</strong></td>
+    <td>Toggles the horizontal axis between distance (km) and elapsed time (min).</td>
+  </tr>
+  <tr>
+    <td><strong>Compare</strong></td>
+    <td>Enters comparison mode — click the map or pick from the trip list to overlay a second trip on both charts.</td>
+  </tr>
+  <tr>
+    <td><strong>Back to list</strong></td>
+    <td>Closes the dashboard and returns to the nearby-trip list in the sidebar.</td>
+  </tr>
+  <tr>
+    <td><strong>Close</strong></td>
+    <td>Closes the dashboard, clears all highlights, and hides the sidebar.</td>
+  </tr>
+</table>
+
+<h3>Selecting part of a trip</h3>
+<p>
+  There are two ways to select a segment of the trip:
+</p>
+<ul>
+  <li>
+    <strong>On the chart:</strong> two vertical red lines mark the start and end
+    of the selection, initially covering the whole trip. Drag either line (cursor
+    changes to ↔ when you hover near it) to focus on a segment.
+  </li>
+  <li>
+    <strong>On the map:</strong> click and drag directly along the highlighted
+    trip line to select a segment. The cursor changes to a crosshair during drag.
+  </li>
+</ul>
+<p>
+  The portion of the chart outside the selection is dimmed, the selected segment
+  is shown as a thick black line on the map, and all statistics update live.
+</p>
+
+<table>
+  <tr><th>Statistic</th><th>Meaning</th></tr>
+  <tr><td><strong>Distance</strong></td><td>Total distance covered within the selection.</td></tr>
+  <tr><td><strong>Duration</strong></td><td>Total elapsed time of the selection.</td></tr>
+  <tr><td><strong>Max speed</strong></td><td>Highest instantaneous speed within the selection.</td></tr>
+  <tr><td><strong>Avg speed</strong></td><td>Average speed over the whole selected duration, including stops.</td></tr>
+  <tr><td><strong>Moving avg</strong></td><td>Average speed counting only the time spent moving faster than 1 km/h.</td></tr>
+  <tr><td><strong>Stopped</strong></td><td>Time within the selection spent at less than 1 km/h.</td></tr>
+  <tr><td><strong>Ascent</strong></td><td>Total elevation gained (metres) within the selection.</td></tr>
+  <tr><td><strong>Descent</strong></td><td>Total elevation lost (metres) within the selection.</td></tr>
+  <tr><td><strong>Min / Max ele</strong></td><td>Lowest and highest elevation points within the selection.</td></tr>
+</table>
+
+<h3>Comparing two trips</h3>
+<p>
+  Click <strong>Compare</strong> in the dashboard header to enter comparison mode.
+  The sidebar prompts you to pick a second trip — click the map to find nearby trips,
+  then click one in the list. The second trip's elevation and speed are overlaid
+  on the charts in orange, with a legend, and a summary bar below the charts shows
+  key stats for both trips side by side. Click <strong>Compare</strong> again
+  (now labelled "Cancel compare" or the button toggles off) to clear the comparison.
+</p>
+
+<h2 id="data-folder">7. Where your data is stored</h2>
+
+<p>
+  The first time you run Trip Manager, it asks you to choose or create a
+  <strong>data folder</strong>. Everything personal — your GPX files, processed
+  data, and service credentials — is stored there, separate from the program
+  itself. This means you can share or update the program without sharing your
+  trip data, and you can point different copies of the program at the same
+  data folder.
+</p>
+<p>Inside your data folder you'll find:</p>
+<ul>
+  <li><code>raw_gpx/</code> — your imported GPX files</li>
+  <li><code>processed/</code> — the output of processing, read by the heatmap page</li>
+  <li><code>komoot_credentials.json</code> — your encrypted Komoot login (if used)</li>
+</ul>
+
+<p class="back-to-top"><a href="#">Back to top</a></p>
+
+</body>
+</html>

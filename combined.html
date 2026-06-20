@@ -1,0 +1,1686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Trip Heatmap</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  html, body, #map { height: 100%; margin: 0; padding: 0; }
+
+  #info {
+    position: absolute; top: 10px; right: 10px; z-index: 1000;
+    background: white; padding: 8px 12px; border-radius: 4px;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.4); font-family: sans-serif;
+    font-size: 13px; max-width: 260px;
+  }
+  #info label { display: block; margin-top: 8px; }
+  #info .row { display: flex; align-items: center; gap: 6px; }
+  #info input[type=range] { flex: 1; }
+  hr { border: none; border-top: 1px solid #ddd; margin: 8px 0; }
+
+  #dashboard {
+    position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 1000;
+    background: white; border-radius: 4px; box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+    font-family: sans-serif; font-size: 13px; padding: 8px 12px; display: none;
+  }
+  #dashboard.visible { display: block; }
+  #dashboard-header {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;
+  }
+  #dashboard-header .btn-group { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+  #dashboard-charts { display: flex; gap: 12px; height: 160px; }
+  #dashboard-charts > div { flex: 1; min-width: 0; }
+  #dashboard button { cursor: pointer; }
+  #dashboard-message { color: #555; padding: 6px 0; font-style: italic; }
+
+  /* Layout panel */
+  #layout-panel {
+    background: #fafafa; border: 1px solid #e0e0e0; border-radius: 4px;
+    padding: 8px 10px; margin-bottom: 6px; font-size: 12px;
+  }
+  #layout-panel table { border-collapse: collapse; width: 100%; }
+  #layout-panel th {
+    font-size: 11px; color: #777; font-weight: normal;
+    padding: 2px 6px; text-align: center; white-space: nowrap;
+  }
+  #layout-panel td { padding: 2px 4px; white-space: nowrap; }
+  #layout-panel td.series-name { font-weight: 500; padding-right: 8px; color: #333; }
+  #layout-panel td.unavailable { opacity: 0.35; }
+  #layout-panel input[type=radio] { cursor: pointer; }
+  #layout-panel select { font-size: 11px; padding: 1px 3px; border: 1px solid #ccc;
+    border-radius: 3px; background: white; cursor: pointer; }
+  .layout-slot-ctrl { margin-top: 6px; display: flex; align-items: center; gap: 8px;
+    border-top: 1px solid #eee; padding-top: 6px; }
+  .layout-slot-ctrl button { font-size: 11px; padding: 1px 8px; }
+  .layout-slot-ctrl span { color: #555; font-size: 11px; }
+
+  #dashboard-stats, #dashboard-stats-b {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+    gap: 4px 12px;
+  }
+  .stat { display: flex; flex-direction: column; }
+  .stat-label { color: #777; font-size: 11px; }
+  .stat-value { font-weight: bold; font-size: 14px; }
+  .stat-value.ascent  { color: #c62828; }
+  .stat-value.descent { color: #1565c0; }
+  .stat-diff { font-size: 11px; font-weight: normal; color: #555; margin-left: 3px; }
+
+  /* Stats area — wraps A and B columns */
+  #stats-area {
+    margin-top: 6px; padding-top: 6px; border-top: 1px solid #eee;
+  }
+  /* Per-trip column */
+  .compare-col {
+    border-radius: 4px; padding: 4px 6px;
+    border: 2px solid transparent; cursor: default;
+    box-sizing: border-box;
+  }
+  #stats-area.comparing .compare-col { cursor: pointer; }
+  #stats-area.comparing .compare-col:hover { background: rgba(0,0,0,0.03); }
+  #stats-area.comparing .compare-col.picking { background: #fff9c4; border-color: #f9a825; }
+  #compare-col-b { border-top: 1px solid #eee; margin-top: 2px; padding-top: 6px; }
+
+  /* Column header: badge + trip name */
+  .compare-col-header { display: none; align-items: center; margin-bottom: 6px; }
+  #stats-area.comparing .compare-col-header { display: flex; }
+  .compare-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; border-radius: 3px;
+    font-size: 12px; font-weight: 800; color: #fff;
+    margin-right: 6px; flex-shrink: 0;
+  }
+  .compare-col-trip-name { font-size: 12px; font-weight: bold; }
+
+
+  #sport-filters input[type=color] { width: 28px; height: 22px; padding: 0; border: none; cursor: pointer; }
+
+  #loading-overlay {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 2000;
+    background: rgba(255,255,255,0.85); display: flex; align-items: center;
+    justify-content: center; font-family: sans-serif;
+  }
+  #loading-overlay.hidden { display: none; }
+  #loading-box {
+    background: white; border-radius: 6px; box-shadow: 0 1px 8px rgba(0,0,0,0.4);
+    padding: 20px 28px; text-align: center; min-width: 260px;
+  }
+  #loading-box .spinner {
+    margin: 0 auto 12px; width: 28px; height: 28px;
+    border: 3px solid #ddd; border-top-color: #1976d2;
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+  }
+  #loading-box.error .spinner { display: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #loading-progress-bar { margin-top: 10px; height: 6px; border-radius: 3px; background: #eee; overflow: hidden; }
+  #loading-progress-fill { height: 100%; width: 0%; background: #1976d2; transition: width 0.1s linear; }
+
+  .tracks-canvas-layer { pointer-events: none; transform-origin: 0 0; }
+
+  #trip-list-wrap button.close-btn {
+    float: right; background: none; border: none; cursor: pointer;
+    font-size: 14px; color: #999; line-height: 1; padding: 0 2px;
+  }
+  #trip-list-wrap button.close-btn:hover { color: #333; }
+  .trip-list-item {
+    cursor: pointer; padding: 3px 0; border-bottom: 1px solid #eee; font-size: 12px;
+  }
+  .trip-list-item:hover { background: #f5f5f5; }
+  .trip-list-item.compare-pick { padding-left: 4px; border-left: 3px solid #f9a825; }
+
+  .drag-selecting, .drag-selecting * { cursor: crosshair !important; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div id="loading-overlay">
+  <div id="loading-box">
+    <div class="spinner"></div>
+    <div id="loading-text">Loading data...</div>
+    <div id="loading-progress-bar"><div id="loading-progress-fill"></div></div>
+  </div>
+</div>
+
+<div id="info">
+  <strong>Trip Heatmap</strong>
+  <a href="help.html" target="_blank" style="float:right;font-size:12px;">Help</a>
+  <hr>
+  <div class="row">
+    <button id="folder-picker-btn" type="button">Select data folder...</button>
+  </div>
+  <div id="data-folder-label" style="font-size:11px;color:#777;margin-top:2px;">Loaded from: processed/</div>
+  <input type="file" id="folder-picker" webkitdirectory style="display:none">
+  <hr>
+  <label class="row">
+    <input type="checkbox" id="show-tracks" checked> GPS tracks
+  </label>
+  <label class="row">
+    <span style="width:50px">Width</span>
+    <input type="range" id="track-width" min="1" max="8" step="0.5" value="2">
+  </label>
+  <label class="row">
+    <span style="width:50px">Opacity</span>
+    <input type="range" id="track-opacity" min="0.05" max="1" step="0.05" value="0.5">
+  </label>
+  <hr>
+  <strong>Sport type</strong> <span style="font-size:11px;color:#777;">(colors editable)</span>
+  <div id="sport-filters"></div>
+  <hr>
+  <label class="row">
+    <span style="width:80px">Click radius</span>
+    <input type="range" id="click-radius" min="5" max="80" step="5" value="20">
+    <span id="click-radius-label" style="width:50px;text-align:right;">— m</span>
+  </label>
+  <div style="font-size:11px;color:#777;margin-top:4px;">
+    Radius scales with zoom. Click the map to list nearby trips.
+  </div>
+  <div id="trip-list-wrap" style="display:none;">
+    <hr>
+    <button class="close-btn" id="trip-list-close" title="Clear">&times;</button>
+    <strong id="trip-list-title">Nearby trips</strong>
+    <div id="trip-list" style="max-height:220px;overflow-y:auto;margin-top:6px;"></div>
+  </div>
+</div>
+
+<div id="dashboard">
+  <div id="dashboard-header">
+    <strong id="dashboard-title">Trip details</strong>
+    <div class="btn-group">
+      <button id="layout-btn" type="button">Layout ▾</button>
+      <button id="dashboard-xtoggle" type="button">X: Distance</button>
+      <button id="dashboard-compare" type="button">Compare</button>
+      <button id="dashboard-back" type="button">Back to list</button>
+      <button id="dashboard-close" type="button">Close</button>
+    </div>
+  </div>
+  <div id="layout-panel" style="display:none;"></div>
+  <div id="dashboard-message" style="display:none;"></div>
+  <div id="dashboard-charts"></div>
+
+  <div id="stats-area">
+    <div id="compare-col-a" class="compare-col">
+      <div id="stats-label-a" class="compare-col-header">
+        <span id="stats-badge-a" class="compare-badge">A</span>
+        <span id="stats-label-a-main" class="compare-col-trip-name"></span>
+      </div>
+      <div id="dashboard-stats">
+        <div class="stat"><span class="stat-label">Distance</span><span id="stat-distance" class="stat-value">-</span></div>
+        <div class="stat"><span class="stat-label">Duration</span><span id="stat-duration" class="stat-value">-</span></div>
+        <div class="stat"><span class="stat-label">Max speed</span><span id="stat-max-speed" class="stat-value">-</span></div>
+        <div class="stat"><span class="stat-label">Avg speed</span><span id="stat-avg-speed" class="stat-value">-</span></div>
+        <div class="stat"><span class="stat-label">Moving avg</span><span id="stat-moving-speed" class="stat-value">-</span></div>
+        <div class="stat"><span class="stat-label">Stopped</span><span id="stat-stopped" class="stat-value">-</span></div>
+        <div class="stat"><span class="stat-label">Ascent</span><span id="stat-ascent" class="stat-value ascent">-</span></div>
+        <div class="stat"><span class="stat-label">Descent</span><span id="stat-descent" class="stat-value descent">-</span></div>
+        <div class="stat"><span class="stat-label">Min / Max ele</span><span id="stat-ele-range" class="stat-value">-</span></div>
+        <div class="stat" id="stat-hr-row" style="display:none"><span class="stat-label">Avg / Max HR</span><span id="stat-hr" class="stat-value">-</span></div>
+        <div class="stat" id="stat-cad-row" style="display:none"><span class="stat-label">Avg cadence</span><span id="stat-cad" class="stat-value">-</span></div>
+      </div>
+    </div>
+    <div id="compare-col-b" class="compare-col" style="display:none">
+      <div id="stats-label-b" class="compare-col-header">
+        <span id="stats-badge-b" class="compare-badge">B</span>
+        <span id="stats-label-b-main" class="compare-col-trip-name"></span>
+      </div>
+      <div id="dashboard-stats-b">
+        <div class="stat"><span class="stat-label">Distance</span><span class="stat-value"><span id="stat-b-distance">-</span><span id="stat-b-distance-diff" class="stat-diff"></span></span></div>
+        <div class="stat"><span class="stat-label">Duration</span><span class="stat-value"><span id="stat-b-duration">-</span><span id="stat-b-duration-diff" class="stat-diff"></span></span></div>
+        <div class="stat"><span class="stat-label">Max speed</span><span class="stat-value"><span id="stat-b-max-speed">-</span><span id="stat-b-max-speed-diff" class="stat-diff"></span></span></div>
+        <div class="stat"><span class="stat-label">Avg speed</span><span class="stat-value"><span id="stat-b-avg-speed">-</span><span id="stat-b-avg-speed-diff" class="stat-diff"></span></span></div>
+        <div class="stat"><span class="stat-label">Moving avg</span><span class="stat-value"><span id="stat-b-moving-speed">-</span><span id="stat-b-moving-speed-diff" class="stat-diff"></span></span></div>
+        <div class="stat"><span class="stat-label">Stopped</span><span class="stat-value"><span id="stat-b-stopped">-</span><span id="stat-b-stopped-diff" class="stat-diff"></span></span></div>
+        <div class="stat"><span class="stat-label">Ascent</span><span class="stat-value ascent"><span id="stat-b-ascent">-</span><span id="stat-b-ascent-diff" class="stat-diff"></span></span></div>
+        <div class="stat"><span class="stat-label">Descent</span><span class="stat-value descent"><span id="stat-b-descent">-</span><span id="stat-b-descent-diff" class="stat-diff"></span></span></div>
+        <div class="stat"><span class="stat-label">Min / Max ele</span><span class="stat-value"><span id="stat-b-ele-range">-</span></span></div>
+        <div class="stat" id="stat-b-hr-row" style="display:none"><span class="stat-label">Avg / Max HR</span><span class="stat-value"><span id="stat-b-hr">-</span><span id="stat-b-hr-diff" class="stat-diff"></span></span></div>
+        <div class="stat" id="stat-b-cad-row" style="display:none"><span class="stat-label">Avg cadence</span><span class="stat-value"><span id="stat-b-cad">-</span><span id="stat-b-cad-diff" class="stat-diff"></span></span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script>
+'use strict';
+
+var map = L.map('map', { preferCanvas: true });
+var _baseLayers = {
+  'OpenStreetMap': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  }),
+  'Satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 19,
+    attribution: '&copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics'
+  }),
+  'Topo': L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+    maxZoom: 17,
+    attribution: '&copy; <a href="https://opentopomap.org">OpenTopoMap</a> contributors'
+  }),
+  'Light': L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://carto.com/">CARTO</a>'
+  }),
+  'Dark': L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://carto.com/">CARTO</a>'
+  }),
+};
+_baseLayers['OpenStreetMap'].addTo(map);
+L.control.layers(_baseLayers, null, { position: 'topright', collapsed: true }).addTo(map);
+
+// ── globals ───────────────────────────────────────────────────────────────────
+var rawAll, tripMeta;
+var allSports, activeSports, sportColors;
+var tracksLayer = null;
+var rawGrid = null;
+var customTripDetails = null;
+var dataBaseDir = 'processed/';
+
+var DEFAULT_SPORT_COLORS = {
+  Bike: '#1976d2', Run: '#e53935', Walking: '#43a047',
+  Ski: '#8e24aa', Swimming: '#00acc1', Unknown: '#999999'
+};
+
+function _hexRgb(hex) {
+  return [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)];
+}
+// Returns the highlight/selection color: always black so it stands out against any sport color.
+function highlightColorFor(hex) {
+  return '#111111';
+}
+// Returns a compare-trip color that contrasts with the primary trip's color.
+// Avoids orange when primary is red/orange-ish; uses blue instead.
+function compareColorFor(hex) {
+  var c = _hexRgb(hex);
+  return (c[0] > 150 && c[2] < 100) ? '#1565c0' : '#e65100';
+}
+
+var SPORT_SPEED_SCALE = {
+  Bike: 60, Run: 25, Walking: 15, Ski: 100, Swimming: 10, Unknown: 60
+};
+
+function tripSport(idx) { var m = tripMeta[idx]; return (m && m.sport) ? m.sport : 'Unknown'; }
+function isTripActive(idx) { return activeSports.has(tripSport(idx)); }
+
+// ── loading overlay ───────────────────────────────────────────────────────────
+function setLoadingProgress(text, fraction) {
+  document.getElementById('loading-text').textContent = text;
+  document.getElementById('loading-progress-fill').style.width =
+    Math.round(Math.max(0, Math.min(1, fraction)) * 100) + '%';
+}
+function showLoadingError(text) {
+  document.getElementById('loading-overlay').classList.remove('hidden');
+  document.getElementById('loading-box').classList.add('error');
+  document.getElementById('loading-text').innerHTML = text;
+}
+function hideLoading() { document.getElementById('loading-overlay').classList.add('hidden'); }
+
+// ── GPS tracks canvas layer ───────────────────────────────────────────────────
+var showTracks = true;
+
+var TracksCanvasLayer = L.Layer.extend({
+  onAdd: function (map) {
+    this._map = map;
+    this._canvas = L.DomUtil.create('canvas', 'tracks-canvas-layer');
+    map.getPanes().overlayPane.appendChild(this._canvas);
+    map.on('moveend zoomend resize', this._reset, this);
+    map.on('zoom', this._onZoom, this);
+    if (map.options.zoomAnimation && L.Browser.any3d) map.on('zoomanim', this._onAnimZoom, this);
+    this._reset();
+  },
+  onRemove: function (map) {
+    if (this._rf) { cancelAnimationFrame(this._rf); this._rf = null; }
+    map.getPanes().overlayPane.removeChild(this._canvas);
+    map.off('moveend zoomend resize', this._reset, this);
+    map.off('zoom', this._onZoom, this);
+    map.off('zoomanim', this._onAnimZoom, this);
+  },
+  _onAnimZoom: function (e) { if (this._zoom !== undefined) this._updateTransform(e.center, e.zoom); },
+  _onZoom: function () { if (this._zoom !== undefined) this._updateTransform(this._map.getCenter(), this._map.getZoom()); },
+  _updateTransform: function (center, zoom) {
+    var m = this._map, scale = m.getZoomScale(zoom, this._zoom),
+        pos = L.DomUtil.getPosition(this._canvas), vh = m.getSize().multiplyBy(0.5),
+        cc = m.project(this._center, zoom), dc = m.project(center, zoom),
+        off = dc.subtract(cc), tl = vh.multiplyBy(-scale).add(pos).add(vh).subtract(off);
+    L.DomUtil.setTransform(this._canvas, tl, scale);
+  },
+  _reset: function () {
+    if (this._rf) return;
+    this._rf = requestAnimationFrame(L.bind(this._resetNow, this));
+  },
+  _resetNow: function () {
+    this._rf = null;
+    var m = this._map, sz = m.getSize();
+    if (!sz.x || !sz.y) return;
+    L.DomUtil.setTransform(this._canvas, new L.Point(0, 0), 1);
+    this._canvas.width = sz.x; this._canvas.height = sz.y;
+    this._canvas.style.width = sz.x + 'px'; this._canvas.style.height = sz.y + 'px';
+    L.DomUtil.setPosition(this._canvas, m.containerPointToLayerPoint([0, 0]));
+    this._center = m.getCenter(); this._zoom = m.getZoom();
+    this.redraw();
+  },
+  redraw: function () {
+    if (!this._canvas) return;
+    var ctx = this._canvas.getContext('2d');
+    ctx.clearRect(0, 0, this._canvas.width, this._canvas.height);
+    if (!showTracks || !rawAll) return;
+    ctx.lineWidth = Number(document.getElementById('track-width').value);
+    var baseAlpha = Number(document.getElementById('track-opacity').value);
+    var isComparing = (currentTripIdx != null && compareTripIdx != null);
+    // Dim the canvas only when two trips are being compared so overlapping
+    // strokes don't accumulate past the intended opacity. The two selected
+    // trips are drawn by Leaflet polylines above the canvas and are unaffected.
+    this._canvas.style.opacity = isComparing ? '0.15' : '1';
+    ctx.globalAlpha = baseAlpha;
+    for (var i = 0; i < rawAll.length; i++) {
+      if (!isTripActive(i)) continue;
+      // Skip compared trips — they are shown by dedicated highlight polylines
+      if (currentTripIdx != null && i === currentTripIdx) continue;
+      if (compareTripIdx != null && i === compareTripIdx) continue;
+      var coords = rawAll[i];
+      if (coords.length < 2) continue;
+      ctx.strokeStyle = isComparing ? '#888' : (sportColors[tripSport(i)] || '#999');
+      ctx.beginPath();
+      for (var p = 0; p < coords.length; p++) {
+        var pt = map.latLngToContainerPoint(coords[p]);
+        if (p === 0) ctx.moveTo(pt.x, pt.y); else ctx.lineTo(pt.x, pt.y);
+      }
+      ctx.stroke();
+    }
+  }
+});
+
+function raiseHighlightLayers() {
+  var pane = map.getPanes().overlayPane;
+  var r = map._renderer && map._renderer._container;
+  if (r && r.parentNode === pane) pane.appendChild(r);
+}
+
+// ── click radius (pixel-based, scales with zoom) ──────────────────────────────
+function metersPerPixel() {
+  var lat = map.getCenter().lat;
+  return 40075016.686 * Math.abs(Math.cos(lat * Math.PI / 180)) / Math.pow(2, map.getZoom() + 8);
+}
+function getClickRadiusM() {
+  var px = Number(document.getElementById('click-radius').value);
+  return Math.max(5, Math.round(px * metersPerPixel()));
+}
+function updateClickRadiusLabel() {
+  var m = getClickRadiusM();
+  document.getElementById('click-radius-label').textContent = m >= 1000 ? (m / 1000).toFixed(1) + ' km' : m + ' m';
+}
+map.on('zoomend moveend', updateClickRadiusLabel);
+
+// ── raw grid + radius click ───────────────────────────────────────────────────
+var RAW_GRID_DEG = 0.001;
+
+function buildRawGrid(data) {
+  var grid = {};
+  for (var i = 0; i < data.length; i++) {
+    var seen = {}, coords = data[i];
+    for (var p = 0; p < coords.length; p++) {
+      var k = Math.floor(coords[p][0] / RAW_GRID_DEG) + '_' + Math.floor(coords[p][1] / RAW_GRID_DEG);
+      if (!seen[k]) { seen[k] = true; (grid[k] || (grid[k] = [])).push(i); }
+    }
+  }
+  return grid;
+}
+
+function findTripsNearPoint(latlng, radiusM) {
+  if (!rawGrid || !rawAll) return [];
+  var lat = latlng.lat, lon = latlng.lng;
+  var dLat = radiusM / 111320, dLon = radiusM / (111320 * Math.cos(lat * Math.PI / 180));
+  var cxMin = Math.floor((lat - dLat) / RAW_GRID_DEG), cxMax = Math.floor((lat + dLat) / RAW_GRID_DEG);
+  var cyMin = Math.floor((lon - dLon) / RAW_GRID_DEG), cyMax = Math.floor((lon + dLon) / RAW_GRID_DEG);
+  var cands = {};
+  for (var cx = cxMin; cx <= cxMax; cx++)
+    for (var cy = cyMin; cy <= cyMax; cy++) {
+      var list = rawGrid[cx + '_' + cy]; if (!list) continue;
+      for (var k = 0; k < list.length; k++) cands[list[k]] = true;
+    }
+  var r2 = radiusM * radiusM, cosLat = Math.cos(lat * Math.PI / 180), out = [];
+  for (var idx in cands) {
+    idx = Number(idx); if (!isTripActive(idx)) continue;
+    var coords = rawAll[idx];
+    for (var p = 0; p < coords.length; p++) {
+      var dl = (coords[p][0] - lat) * 111320, dm = (coords[p][1] - lon) * 111320 * cosLat;
+      if (dl * dl + dm * dm <= r2) { out.push(idx); break; }
+    }
+  }
+  return out;
+}
+
+var clickCircle = null;
+function showClickCircle(latlng, radiusM) {
+  if (clickCircle) map.removeLayer(clickCircle);
+  clickCircle = L.circle(latlng, {
+    radius: radiusM, color: '#1976d2', weight: 1.5, opacity: 0.7,
+    fillColor: '#1976d2', fillOpacity: 0.07
+  }).addTo(map);
+}
+
+// ── similarity scoring for comparison sort ────────────────────────────────────
+var currentTripCells = null; // Set of grid-cell keys for currentTripIdx
+
+function buildCurrentTripCells(idx) {
+  currentTripCells = new Set();
+  var coords = rawAll[idx];
+  for (var i = 0; i < coords.length; i++)
+    currentTripCells.add(Math.floor(coords[i][0] / RAW_GRID_DEG) + '_' + Math.floor(coords[i][1] / RAW_GRID_DEG));
+}
+
+function tripSimilarityScore(idx) {
+  var score = 0;
+  if (!currentTripCells || currentTripIdx == null) return score;
+  // Same sport
+  if (tripSport(idx) === tripSport(currentTripIdx)) score += 100;
+  // Similar total distance (ratio 0-1 → up to 50 pts)
+  var da = tripMeta[currentTripIdx] ? tripMeta[currentTripIdx].distanceKm : 0;
+  var db = tripMeta[idx].distanceKm;
+  if (da > 0 && db > 0) score += (Math.min(da, db) / Math.max(da, db)) * 50;
+  // Geographic overlap (1 pt per shared cell)
+  var coords = rawAll[idx];
+  for (var i = 0; i < coords.length; i++) {
+    var k = Math.floor(coords[i][0] / RAW_GRID_DEG) + '_' + Math.floor(coords[i][1] / RAW_GRID_DEG);
+    if (currentTripCells.has(k)) score += 1;
+  }
+  return score;
+}
+
+// ── trip list + comparison pick ───────────────────────────────────────────────
+var comparePickMode = false;  // true while sidebar is in "pick a trip to replace a slot"
+var comparePickSlot = null;   // 'a' or 'b'
+var lastFoundTrips = [];
+
+map.on('click', function (e) {
+  if (mapDragSelecting) return;
+  var radiusM = getClickRadiusM();
+  showClickCircle(e.latlng, radiusM);
+  var found = findTripsNearPoint(e.latlng, radiusM);
+  if (comparePickMode) {
+    lastFoundTrips = found.slice(); // keep fresh so re-entering pick mode shows the right area
+    var title = found.length
+      ? 'Pick to replace trip ' + (comparePickSlot === 'a' ? 'A' : 'B') + ' (' + found.length + ' nearby)'
+      : 'No trips within ' + radiusM + ' m — try elsewhere';
+    document.getElementById('trip-list-title').textContent = title;
+    showTripListForCompare(found);
+    document.getElementById('trip-list-wrap').style.display = 'block';
+  } else {
+    lastFoundTrips = found.slice();
+    var radiusLabel = radiusM >= 1000 ? (radiusM / 1000).toFixed(1) + ' km' : radiusM + ' m';
+    var title2 = found.length
+      ? found.length + ' trip' + (found.length !== 1 ? 's' : '') + ' within ' + radiusLabel
+      : 'No trips within ' + radiusLabel;
+    document.getElementById('trip-list-title').textContent = title2;
+    showTripList(found);
+  }
+});
+
+document.getElementById('trip-list-close').addEventListener('click', function () {
+  if (clickCircle) { map.removeLayer(clickCircle); clickCircle = null; }
+  document.getElementById('trip-list-wrap').style.display = 'none';
+  unselectTrip();
+  exitComparePickMode();
+});
+
+function showTripList(tripIdxs) {
+  var el = document.getElementById('trip-list');
+  el.innerHTML = '';
+  tripIdxs.slice().sort(function (a, b) {
+    return tripMeta[a].date < tripMeta[b].date ? -1 : 1;
+  }).forEach(function (idx) {
+    var m = tripMeta[idx], div = document.createElement('div');
+    div.className = 'trip-list-item';
+    div.dataset.idx = idx;
+    div.textContent = m.date + ' — ' + m.distanceKm + ' km' + (m.sport ? ' — ' + m.sport : '');
+    div.addEventListener('click', function () { highlightTrip(idx); });
+    el.appendChild(div);
+  });
+  document.getElementById('trip-list-wrap').style.display = 'block';
+}
+
+function showTripListForCompare(tripIdxs) {
+  var el = document.getElementById('trip-list');
+  el.innerHTML = '';
+  // sort by similarity score (most similar first)
+  var sorted = tripIdxs
+    .filter(function (idx) {
+      // for slot B: exclude currentTripIdx; for slot A: exclude compareTripIdx
+      if (comparePickSlot === 'b' && idx === currentTripIdx) return false;
+      if (comparePickSlot === 'a' && idx === compareTripIdx) return false;
+      return true;
+    })
+    .map(function (idx) { return { idx: idx, score: tripSimilarityScore(idx) }; })
+    .sort(function (a, b) { return b.score - a.score; });
+
+  sorted.forEach(function (item) {
+    var idx = item.idx, m = tripMeta[idx], div = document.createElement('div');
+    div.className = 'trip-list-item compare-pick';
+    div.dataset.idx = idx;
+    div.textContent = m.date + ' — ' + m.distanceKm + ' km' + (m.sport ? ' — ' + m.sport : '');
+    div.addEventListener('click', function () { replaceCompareSlot(idx); });
+    el.appendChild(div);
+  });
+}
+
+// ── highlight layer + map drag selection ──────────────────────────────────────
+var highlightLayer = null;
+var highlightHitLayer = null;
+var compareTripHighlight = null;
+var mapDragSelecting = false;
+var mapDragStartIdx = null;
+
+function nearestTripPointIdx(latlng, tripIdx) {
+  var coords = rawAll[tripIdx], best = 0, bestD = Infinity;
+  for (var i = 0; i < coords.length; i++) {
+    var dl = coords[i][0] - latlng.lat, dm = coords[i][1] - latlng.lng;
+    var d = dl * dl + dm * dm;
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  return best;
+}
+
+function enableMapDragSelect(idx) {
+  highlightHitLayer = L.polyline(rawAll[idx], { weight: 20, opacity: 0, interactive: true }).addTo(map);
+  raiseHighlightLayers();
+
+  highlightHitLayer.on('mousedown', function (e) {
+    if (comparePickMode) return;
+    mapDragSelecting = true;
+    mapDragStartIdx = nearestTripPointIdx(e.latlng, idx);
+    map.dragging.disable();
+    map.getContainer().classList.add('drag-selecting');
+    L.DomEvent.stopPropagation(e);
+
+    function onMove(ev) {
+      if (!mapDragSelecting) return;
+      var endIdx = nearestTripPointIdx(ev.latlng, idx);
+      setSelection(Math.min(mapDragStartIdx, endIdx), Math.max(mapDragStartIdx, endIdx));
+    }
+    function onUp() {
+      mapDragSelecting = false;
+      map.dragging.enable();
+      map.getContainer().classList.remove('drag-selecting');
+      map.off('mousemove', onMove);
+      map.off('mouseup', onUp);
+    }
+    map.on('mousemove', onMove);
+    map.on('mouseup', onUp);
+  });
+}
+
+function disableMapDragSelect() {
+  if (highlightHitLayer) { map.removeLayer(highlightHitLayer); highlightHitLayer = null; }
+  mapDragSelecting = false;
+  map.dragging.enable();
+  map.getContainer().classList.remove('drag-selecting');
+}
+
+function _doHighlightTrip(idx) {
+  if (highlightLayer) { map.removeLayer(highlightLayer); highlightLayer = null; }
+  disableMapDragSelect();
+  clearChartCursor();
+  selStartIdx = null; selEndIdx = null;
+  var tripColor = (sportColors && sportColors[tripSport(idx)]) || '#1976d2';
+  highlightLayer = L.polyline(rawAll[idx], { color: highlightColorFor(tripColor), weight: 5, opacity: 0.9 }).addTo(map);
+  enableMapDragSelect(idx);
+  raiseHighlightLayers();
+  highlightLayer.on('mousemove', function (e) { onMapHover(idx, e.latlng); });
+  highlightLayer.on('mouseout', function () { clearChartCursor(); });
+  var m = tripMeta[idx];
+  document.getElementById('dashboard-title').textContent =
+    m.date + ' — ' + m.distanceKm + ' km' + (m.sport ? ' — ' + m.sport : '');
+}
+
+function highlightTrip(idx) {
+  clearComparison();
+  _doHighlightTrip(idx);
+  exitComparePickMode();
+  currentTripIdx = idx;
+  buildCurrentTripCells(idx);
+  if (tracksLayer) tracksLayer.redraw(); // dim other tracks
+  document.getElementById('dashboard').classList.add('visible');
+  loadTripDetail(idx, function (detail) {
+    if (!detail) { showDashboardMessage('No detail data. Rerun combine_trips.py to generate trip_details/.'); return; }
+    currentDetail = detail;
+    renderDashboard();
+  });
+}
+
+// ── comparison ────────────────────────────────────────────────────────────────
+var compareTripIdx = null;
+var compareDetail  = null;
+var compareXs      = null;  // x-array for compare trip (aligned with compareDetail)
+var COMPARE_COLOR  = '#e65100';  // default; overridden per-pair by compareColorFor()
+var activeCompareColor = COMPARE_COLOR;
+
+function enterComparePickMode(slot) {
+  comparePickMode = true;
+  comparePickSlot = slot;
+  var label = slot === 'a' ? 'A' : 'B';
+  document.getElementById('dashboard-compare').textContent = 'Cancel';
+  document.getElementById('trip-list-title').textContent = 'Pick a trip to replace ' + label;
+  document.getElementById('trip-list-wrap').style.display = 'block';
+  document.getElementById('compare-col-' + slot).classList.add('picking');
+  if (lastFoundTrips.length > 0) showTripListForCompare(lastFoundTrips);
+}
+
+function exitComparePickMode() {
+  if (!comparePickMode) return;
+  comparePickMode = false;
+  if (comparePickSlot) document.getElementById('compare-col-' + comparePickSlot).classList.remove('picking');
+  comparePickSlot = null;
+  document.getElementById('dashboard-compare').textContent = 'Compare';
+  // Do NOT rebuild the trip list here — doing so overwrites compare-pick handlers with
+  // highlightTrip handlers, which breaks the replacement flow for the next pick.
+  // The list is rebuilt on the next normal map click via showTripList().
+}
+
+function replaceCompareSlot(idx) {
+  if (!comparePickMode) return; // stale handler — pick mode already exited (e.g. double-click)
+  var slot = comparePickSlot;
+  exitComparePickMode();
+
+  if (slot === 'b' || slot == null) {
+    // Replace / set trip B
+    loadComparison(idx);
+  } else {
+    // Replace trip A — keep trip B intact
+    var savedB = compareTripIdx, savedBDetail = compareDetail;
+    _doHighlightTrip(idx);
+    currentTripIdx = idx;
+    buildCurrentTripCells(idx);
+    // Restore B
+    compareTripIdx  = savedB;
+    compareDetail   = savedBDetail;
+    compareXs = savedBDetail ? xValues(savedBDetail) : null;
+    if (savedB != null && !compareTripHighlight) {
+      activeCompareColor = compareColorFor((sportColors && sportColors[tripSport(currentTripIdx)]) || '#1976d2');
+      compareTripHighlight = L.polyline(rawAll[savedB], { color: activeCompareColor, weight: 5, opacity: 0.9 }).addTo(map);
+      raiseHighlightLayers();
+      if (tracksLayer) tracksLayer.redraw();
+    }
+    loadTripDetail(idx, function (detail) {
+      if (!detail) { showDashboardMessage('No detail data for this trip.'); return; }
+      currentDetail = detail;
+      renderDashboard();
+      updateCompareBar();
+    });
+  }
+}
+
+function loadComparison(idx) {
+  compareTripIdx = idx;
+  loadTripDetail(idx, function (detail) {
+    if (!detail) { alert('No detail data for this trip.'); return; }
+    compareDetail = detail;
+    compareXs = xValues(detail);
+    activeCompareColor = compareColorFor((sportColors && sportColors[tripSport(currentTripIdx)]) || '#1976d2');
+    if (compareTripHighlight) map.removeLayer(compareTripHighlight);
+    compareTripHighlight = L.polyline(rawAll[idx], { color: activeCompareColor, weight: 5, opacity: 0.9 }).addTo(map);
+    raiseHighlightLayers();
+    if (tracksLayer) tracksLayer.redraw();
+    updateCompareBar();
+    renderDashboard();
+  });
+}
+
+function clearComparison() {
+  compareTripIdx = null; compareDetail = null; compareXs = null;
+  if (compareTripHighlight) { map.removeLayer(compareTripHighlight); compareTripHighlight = null; }
+  if (compareCursorMarker)  { map.removeLayer(compareCursorMarker);  compareCursorMarker = null; }
+  document.getElementById('stats-area').classList.remove('comparing');
+  var colB = document.getElementById('compare-col-b');
+  colB.style.display = 'none';
+  colB.classList.remove('picking');
+  var colA = document.getElementById('compare-col-a');
+  colA.onclick = null;
+  colB.onclick = null;
+  colA.classList.remove('picking');
+}
+
+function setCompareSlotActive(slot) {
+  // No-op — visual active state removed in favour of simpler click-to-replace.
+  // Keeping the function so existing callers don't break.
+}
+
+function updateCompareBar() {
+  if (compareTripIdx == null || !compareDetail || !compareXs || currentTripIdx == null || !currentDetail || !currentXs) return;
+  var ma = tripMeta[currentTripIdx], mb = tripMeta[compareTripIdx];
+
+  // Trip A stats use current selection; Trip B stats use the same x-value range mapped onto Trip B
+  var si = selStartIdx != null ? selStartIdx : 0;
+  var ei = selEndIdx   != null ? selEndIdx   : currentDetail.d.length - 1;
+  var sa = computeSelectionStats(currentDetail, si, ei);
+  var bsi = indexForX(compareXs, currentXs[si]);
+  var bei = indexForX(compareXs, currentXs[ei]);
+  var sb = computeSelectionStats(compareDetail, bsi, bei);
+
+  function fmt(st) {
+    return formatDuration(st.totalDurS) + ' · avg ' + st.avgSpeed.toFixed(1) + ' km/h' +
+           (st.ascent > 1 ? ' · +' + Math.round(st.ascent) + 'm' : '');
+  }
+
+  // Show comparing layout: two side-by-side clickable columns
+  var colorA = (sportColors && sportColors[tripSport(currentTripIdx)]) || '#1976d2';
+  var colorB = activeCompareColor;
+  var statsArea = document.getElementById('stats-area');
+  statsArea.classList.add('comparing');
+
+  document.getElementById('stats-badge-a').style.background = colorA;
+  document.getElementById('stats-label-a-main').textContent = ma.date + ' — ' + ma.distanceKm + ' km';
+
+  document.getElementById('stats-badge-b').style.background = colorB;
+  document.getElementById('stats-label-b-main').textContent = mb.date + ' — ' + mb.distanceKm + ' km';
+
+  var colA = document.getElementById('compare-col-a');
+  var colB = document.getElementById('compare-col-b');
+  colB.style.display = '';
+  colA.onclick = function () { enterComparePickMode('a'); };
+  colB.onclick = function () { enterComparePickMode('b'); };
+
+  // Diff helpers
+  function signedNum(v, ref, dec, unit) {
+    var d = v - ref;
+    return '(' + (d >= 0 ? '+' : '') + d.toFixed(dec) + (unit ? ' ' + unit : '') + ')';
+  }
+  function signedDur(bS, aS) {
+    var d = Math.round(bS - aS);
+    var sign = d >= 0 ? '+' : '-';
+    d = Math.abs(d);
+    var m = Math.floor(d / 60), s = d % 60;
+    return '(' + sign + m + ':' + (s < 10 ? '0' : '') + s + ')';
+  }
+  function signedM(bV, aV) {
+    var d = Math.round(bV - aV);
+    return '(' + (d >= 0 ? '+' : '') + d + ' m)';
+  }
+  function setB(id, val, diff) {
+    document.getElementById(id).textContent = val;
+    var dEl = document.getElementById(id + '-diff');
+    if (dEl) dEl.textContent = diff || '';
+  }
+
+  // Trip B stats (same selection range mapped by x-value)
+  setB('stat-b-distance',      sb.totalDistKm.toFixed(2) + ' km',
+       signedNum(sb.totalDistKm, sa.totalDistKm, 2, 'km'));
+  setB('stat-b-duration',      formatDuration(sb.totalDurS),
+       signedDur(sb.totalDurS, sa.totalDurS));
+  setB('stat-b-max-speed',     sb.maxSpd.toFixed(1) + ' km/h',
+       signedNum(sb.maxSpd, sa.maxSpd, 1, 'km/h'));
+  setB('stat-b-avg-speed',     sb.avgSpeed.toFixed(1) + ' km/h',
+       signedNum(sb.avgSpeed, sa.avgSpeed, 1, 'km/h'));
+  setB('stat-b-moving-speed',  sb.movingAvgSpeed.toFixed(1) + ' km/h',
+       signedNum(sb.movingAvgSpeed, sa.movingAvgSpeed, 1, 'km/h'));
+  setB('stat-b-stopped',       formatDuration(sb.stoppedS),
+       signedDur(sb.stoppedS, sa.stoppedS));
+  setB('stat-b-ascent',        sb.ascent  > 1 ? '+' + Math.round(sb.ascent)  + ' m' : '-',
+       sb.ascent > 1 && sa.ascent > 1 ? signedM(sb.ascent, sa.ascent) : '');
+  setB('stat-b-descent',       sb.descent > 1 ? '-' + Math.round(sb.descent) + ' m' : '-',
+       sb.descent > 1 && sa.descent > 1 ? signedM(-sb.descent, -sa.descent) : '');
+  document.getElementById('stat-b-ele-range').textContent =
+    (sb.minEle != null && sb.maxEle != null) ? Math.round(sb.minEle) + ' / ' + Math.round(sb.maxEle) + ' m' : '-';
+  document.getElementById('stat-b-hr-row').style.display  = (sb.avgHr  != null || sa.avgHr  != null) ? '' : 'none';
+  document.getElementById('stat-b-cad-row').style.display = (sb.avgCad != null || sa.avgCad != null) ? '' : 'none';
+  setB('stat-b-hr',  sb.avgHr  != null ? sb.avgHr  + ' / ' + sb.maxHr  + ' bpm' : '-',
+       sb.avgHr != null && sa.avgHr != null ? signedNum(sb.avgHr, sa.avgHr, 0, 'bpm') : '');
+  setB('stat-b-cad', sb.avgCad != null ? sb.avgCad + ' rpm' : '-',
+       sb.avgCad != null && sa.avgCad != null ? signedNum(sb.avgCad, sa.avgCad, 0, 'rpm') : '');
+}
+
+function destroyAllCharts() {
+  chartSlots.forEach(function (c) { if (c) c.destroy(); });
+  chartSlots = []; chartSlotMeta = [];
+  var slotsEl = document.getElementById('dashboard-charts');
+  if (slotsEl) slotsEl.innerHTML = '';
+}
+
+function showDashboardMessage(text) {
+  destroyAllCharts();
+  currentDetail = null; currentXs = null; selStartIdx = null; selEndIdx = null;
+  document.querySelectorAll('#dashboard-stats .stat-value').forEach(function (el) { el.textContent = '-'; });
+  document.getElementById('dashboard-charts').style.display = 'none';
+  var msg = document.getElementById('dashboard-message');
+  msg.textContent = text; msg.style.display = 'block';
+}
+
+// ── selection ─────────────────────────────────────────────────────────────────
+var currentTripIdx = null, currentDetail = null;
+var cursorMarker = null, compareCursorMarker = null;
+
+// ── flexible chart layout ─────────────────────────────────────────────────────
+// slotAssignment: series key → slot index (0-based), or -1 = hidden
+var slotAssignment = { elev: 0, spd: 0, hr: 1, cad: 2 };
+var numSlots = 3;
+var MAX_SLOTS = 4;
+var chartColorMode = { elev: 'fill', spd: 'line', hr: 'line', cad: 'line' };
+var COLOR_MODES    = { elev: ['line','fill'], spd: ['line','fill','value'], hr: ['line','fill'], cad: ['line','fill'] };
+var SERIES_KEYS    = ['spd','elev','hr','cad'];
+// Per-series colors for single-trip mode. null = use sport color.
+var SERIES_COLOR   = { elev: '#43a047', spd: null, hr: '#e53935', cad: '#ff9800' };
+var SERIES_LABEL   = { elev:'Elevation', spd:'Speed', hr:'Heart Rate', cad:'Cadence' };
+var SERIES_DATA_KEY= { elev:'e', spd:'s', hr:'hr', cad:'cad' };
+var SERIES_Y_LABEL = { elev:'Elevation (m)', spd:'Speed (km/h)', hr:'HR (bpm)', cad:'Cadence (rpm)' };
+// per slot: array of Chart instances, and series counts (for cursor)
+var chartSlots = [];       // Chart per slot index
+var chartSlotMeta = [];    // {seriesCount: N} per slot
+
+function allCharts() { return chartSlots.filter(Boolean); }
+function chartForCanvas(canvas) {
+  for (var i = 0; i < chartSlots.length; i++)
+    if (chartSlots[i] && chartSlots[i].canvas === canvas) return chartSlots[i];
+  return null;
+}
+
+// ── layout panel ──────────────────────────────────────────────────────────────
+var layoutPanelOpen = false;
+
+function renderLayoutPanel() {
+  var panel = document.getElementById('layout-panel');
+  var available = {
+    elev: true, spd: true,
+    hr:  !!(currentDetail && currentDetail.hr  || compareDetail && compareDetail && compareDetail.hr),
+    cad: !!(currentDetail && currentDetail.cad || compareDetail && compareDetail && compareDetail.cad)
+  };
+
+  var html = '<table><thead><tr><th></th>';
+  for (var s = 0; s < numSlots; s++) html += '<th>Chart ' + (s + 1) + '</th>';
+  html += '<th>Hidden</th><th style="padding-left:10px">Style</th></tr></thead><tbody>';
+
+  SERIES_KEYS.forEach(function (key) {
+    var avail = available[key];
+    html += '<tr' + (avail ? '' : ' class="unavailable"') + '>';
+    html += '<td class="series-name">' + SERIES_LABEL[key] + '</td>';
+    for (var s = 0; s < numSlots; s++) {
+      html += '<td style="text-align:center"><input type="radio" name="slot-' + key + '" value="' + s + '"' +
+        (slotAssignment[key] === s ? ' checked' : '') +
+        (avail ? '' : ' disabled') + '></td>';
+    }
+    html += '<td style="text-align:center"><input type="radio" name="slot-' + key + '" value="-1"' +
+      (slotAssignment[key] === -1 ? ' checked' : '') +
+      (avail ? '' : ' disabled') + '></td>';
+
+    // Style selector
+    var modes = COLOR_MODES[key];
+    html += '<td style="padding-left:10px"><select data-key="' + key + '"' + (avail ? '' : ' disabled') + '>';
+    modes.forEach(function (m) {
+      var label = m === 'line' ? 'Line' : m === 'fill' ? 'Fill ▓' : 'Value ≋';
+      html += '<option value="' + m + '"' + (chartColorMode[key] === m ? ' selected' : '') + '>' + label + '</option>';
+    });
+    html += '</select></td></tr>';
+  });
+
+  html += '</tbody></table>';
+  html += '<div class="layout-slot-ctrl">';
+  html += '<button id="layout-fewer" ' + (numSlots <= 1 ? 'disabled' : '') + '>− Chart</button>';
+  html += '<span>' + numSlots + ' chart' + (numSlots > 1 ? 's' : '') + '</span>';
+  html += '<button id="layout-more" ' + (numSlots >= MAX_SLOTS ? 'disabled' : '') + '>+ Chart</button>';
+  html += '</div>';
+
+  panel.innerHTML = html;
+
+  // Wire up radio buttons
+  SERIES_KEYS.forEach(function (key) {
+    panel.querySelectorAll('input[name="slot-' + key + '"]').forEach(function (radio) {
+      radio.addEventListener('change', function () {
+        slotAssignment[key] = parseInt(this.value, 10);
+        if (currentDetail) renderDashboard();
+      });
+    });
+  });
+
+  // Wire up style selects
+  panel.querySelectorAll('select[data-key]').forEach(function (sel) {
+    sel.addEventListener('change', function () {
+      chartColorMode[this.dataset.key] = this.value;
+      if (currentDetail) renderDashboard();
+    });
+  });
+
+  // Slot count buttons
+  var fewerBtn = document.getElementById('layout-fewer');
+  var moreBtn  = document.getElementById('layout-more');
+  if (fewerBtn) fewerBtn.addEventListener('click', function () {
+    if (numSlots <= 1) return;
+    numSlots--;
+    // Move any series assigned to the removed slot to the last remaining slot
+    SERIES_KEYS.forEach(function (k) { if (slotAssignment[k] >= numSlots) slotAssignment[k] = numSlots - 1; });
+    renderLayoutPanel();
+    if (currentDetail) renderDashboard();
+  });
+  if (moreBtn) moreBtn.addEventListener('click', function () {
+    if (numSlots >= MAX_SLOTS) return;
+    numSlots++;
+    renderLayoutPanel();
+    if (currentDetail) renderDashboard();
+  });
+}
+
+document.getElementById('layout-btn').addEventListener('click', function () {
+  layoutPanelOpen = !layoutPanelOpen;
+  var panel = document.getElementById('layout-panel');
+  if (layoutPanelOpen) { renderLayoutPanel(); panel.style.display = ''; }
+  else panel.style.display = 'none';
+  this.textContent = layoutPanelOpen ? 'Layout ▴' : 'Layout ▾';
+});
+
+// ── color mode helpers ────────────────────────────────────────────────────────
+function hexToRgba(hex, alpha) {
+  var r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+  return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+}
+
+function makeGradientBg(color) {
+  return function (context) {
+    var chart = context.chart, ca = chart.chartArea;
+    if (!ca) return hexToRgba(color, 0.35);
+    var g = chart.ctx.createLinearGradient(0, ca.top, 0, ca.bottom);
+    g.addColorStop(0, hexToRgba(color, 0.55));
+    g.addColorStop(1, hexToRgba(color, 0.0));
+    return g;
+  };
+}
+
+function applyColorMode(dataset, key, color, maxSpeed) {
+  var mode = chartColorMode[key];
+  if (mode === 'fill') {
+    dataset.fill = true;
+    dataset.backgroundColor = makeGradientBg(color);
+  } else if (mode === 'value' && key === 'spd' && maxSpeed) {
+    dataset.fill = false;
+    var cap = maxSpeed;
+    dataset.segment = {
+      borderColor: function (ctx) {
+        var avg = (ctx.p0.parsed.y + ctx.p1.parsed.y) / 2;
+        var t = Math.min(Math.max(avg / cap, 0), 1);
+        return 'hsl(' + Math.round(120 * (1 - t)) + ',85%,42%)';
+      }
+    };
+  } else {
+    dataset.fill = false;
+  }
+}
+var currentXs = null, selStartIdx = null, selEndIdx = null;
+var crosshairX = null;
+var highlightSelectionLayer = null;
+var dragHandle = null, dragChart = null, dragCanvasRect = null;
+var SELECTION_HANDLE_PX = 8;
+
+var selectionPlugin = {
+  id: 'selectionOverlay',
+  afterDraw: function (chart) {
+    if (!currentDetail || !currentXs || selStartIdx == null || selEndIdx == null) return;
+    var area = chart.chartArea, x = chart.scales.x;
+    var s = x.getPixelForValue(currentXs[selStartIdx]);
+    var e = x.getPixelForValue(currentXs[selEndIdx]);
+    var ctx = chart.ctx;
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    if (s > area.left)  ctx.fillRect(area.left, area.top, s - area.left, area.bottom - area.top);
+    if (e < area.right) ctx.fillRect(e, area.top, area.right - e, area.bottom - area.top);
+    [s, e].forEach(function (px) {
+      ctx.beginPath(); ctx.moveTo(px, area.top); ctx.lineTo(px, area.bottom);
+      ctx.strokeStyle = '#e53935'; ctx.lineWidth = 2; ctx.stroke();
+    });
+    ctx.restore();
+  }
+};
+Chart.register(selectionPlugin);
+
+var crosshairPlugin = {
+  id: 'crosshair',
+  afterDraw: function (chart) {
+    if (crosshairX == null) return;
+    var ca = chart.chartArea;
+    if (crosshairX < ca.left || crosshairX > ca.right) return;
+    var ctx = chart.ctx;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(80,80,80,0.5)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    ctx.moveTo(crosshairX, ca.top);
+    ctx.lineTo(crosshairX, ca.bottom);
+    ctx.stroke();
+    ctx.restore();
+  }
+};
+Chart.register(crosshairPlugin);
+
+// Floating label on the X axis at the crosshair position
+var xAxisLabelPlugin = {
+  id: 'xAxisCurrentLabel',
+  afterDraw: function (chart) {
+    if (crosshairX == null || !chart.chartArea) return;
+    var ca = chart.chartArea;
+    if (crosshairX < ca.left || crosshairX > ca.right) return;
+    var xVal = chart.scales.x.getValueForPixel(crosshairX);
+    var label = xMode === 'time'
+      ? formatDuration(xVal * 60)   // xVal is in minutes → convert to seconds
+      : xVal.toFixed(2) + ' km';
+    var ctx = chart.ctx;
+    ctx.save();
+    ctx.font = 'bold 10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    var w = ctx.measureText(label).width + 8, h = 13;
+    var lx = Math.max(ca.left, Math.min(ca.right - w, crosshairX - w / 2));
+    var ly = ca.bottom + 2;
+    ctx.fillStyle = 'rgba(229,57,53,0.92)';
+    ctx.fillRect(lx, ly, w, h);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(label, lx + w / 2, ly + 1);
+    ctx.restore();
+  }
+};
+Chart.register(xAxisLabelPlugin);
+
+// Tooltip title callback — shows the ALTERNATE X axis value
+// K = number of series in this slot (A datasets are indices 0..K-1, B are K..2K-1)
+function buildTooltipCallbacks(K) {
+  return {
+    title: function (items) {
+      if (!items.length || !currentDetail) return [];
+      var lines = [], seenA = false, seenB = false;
+      items.forEach(function (item) {
+        var isB = item.datasetIndex >= K;
+        if (isB && seenB) return;
+        if (!isB && seenA) return;
+        if (isB) seenB = true; else seenA = true;
+        var detail = (isB && compareDetail) ? compareDetail : currentDetail;
+        var idx = item.dataIndex;
+        var altX = xMode === 'distance'
+          ? formatDuration(detail.t[idx])              // show time when axis = distance
+          : (detail.d[idx] / 1000).toFixed(2) + ' km'; // show distance when axis = time
+        lines.push((compareTripIdx != null ? (isB ? 'B: ' : 'A: ') : '') + altX);
+      });
+      return lines;
+    }
+  };
+}
+
+function computeSelectionStats(detail, startIdx, endIdx) {
+  var totalDistKm = (detail.d[endIdx] - detail.d[startIdx]) / 1000;
+  var totalDurS   = detail.t[endIdx] - detail.t[startIdx];
+  var maxSpd = 0, movTimeS = 0, movDistM = 0, stoppedS = 0;
+  var ascent = 0, descent = 0, minEle = null, maxEle = null;
+
+  for (var i = startIdx + 1; i <= endIdx; i++) {
+    var dt = detail.t[i] - detail.t[i - 1];
+    var dd = detail.d[i] - detail.d[i - 1];
+    var spd = detail.s[i] || 0;
+    if (spd > maxSpd) maxSpd = spd;
+    if (spd > 1) { movTimeS += dt; movDistM += dd; } else { stoppedS += dt; }
+    var e0 = detail.e[i - 1], e1 = detail.e[i];
+    if (e0 != null && e1 != null) { var de = e1 - e0; if (de > 0) ascent += de; else descent -= de; }
+  }
+  for (var i = startIdx; i <= endIdx; i++) {
+    var el = detail.e[i]; if (el == null) continue;
+    if (minEle == null || el < minEle) minEle = el;
+    if (maxEle == null || el > maxEle) maxEle = el;
+  }
+  var hrSum = 0, hrCount = 0, hrMax = 0, cadSum = 0, cadCount = 0;
+  for (var i = startIdx; i <= endIdx; i++) {
+    if (detail.hr && detail.hr[i] != null) {
+      hrSum += detail.hr[i]; hrCount++;
+      if (detail.hr[i] > hrMax) hrMax = detail.hr[i];
+    }
+    if (detail.cad && detail.cad[i] != null) { cadSum += detail.cad[i]; cadCount++; }
+  }
+  return {
+    totalDistKm: totalDistKm, totalDurS: totalDurS, maxSpd: maxSpd,
+    avgSpeed: totalDurS > 0 ? totalDistKm / (totalDurS / 3600) : 0,
+    movingAvgSpeed: movTimeS > 0 ? (movDistM / 1000) / (movTimeS / 3600) : 0,
+    stoppedS: stoppedS, ascent: ascent, descent: descent, minEle: minEle, maxEle: maxEle,
+    avgHr:  hrCount  > 0 ? Math.round(hrSum  / hrCount)  : null,
+    maxHr:  hrMax    > 0 ? hrMax : null,
+    avgCad: cadCount > 0 ? Math.round(cadSum / cadCount) : null,
+  };
+}
+
+function formatDuration(s) {
+  if (!isFinite(s) || s == null) return '--:--';
+  s = Math.max(0, Math.round(s));
+  var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  return (h > 0 ? h + ':' : '') + (h > 0 && m < 10 ? '0' : '') + m + ':' + (sec < 10 ? '0' : '') + sec;
+}
+
+function updateDashboardStats() {
+  var detail = currentDetail, si = selStartIdx, ei = selEndIdx;
+  if (!detail || si == null || ei == null) return;
+  var st = computeSelectionStats(detail, si, ei);
+  if (compareTripIdx != null) updateCompareBar();
+  document.getElementById('stat-distance').textContent     = st.totalDistKm.toFixed(2) + ' km';
+  document.getElementById('stat-duration').textContent     = formatDuration(st.totalDurS);
+  document.getElementById('stat-max-speed').textContent    = st.maxSpd.toFixed(1) + ' km/h';
+  document.getElementById('stat-avg-speed').textContent    = st.avgSpeed.toFixed(1) + ' km/h';
+  document.getElementById('stat-moving-speed').textContent = st.movingAvgSpeed.toFixed(1) + ' km/h';
+  document.getElementById('stat-stopped').textContent      = formatDuration(st.stoppedS);
+  document.getElementById('stat-ascent').textContent       = st.ascent  > 1 ? '+' + Math.round(st.ascent)  + ' m' : '-';
+  document.getElementById('stat-descent').textContent      = st.descent > 1 ? '-' + Math.round(st.descent) + ' m' : '-';
+  document.getElementById('stat-ele-range').textContent    =
+    (st.minEle != null && st.maxEle != null) ? Math.round(st.minEle) + ' / ' + Math.round(st.maxEle) + ' m' : '-';
+  document.getElementById('stat-hr-row').style.display  = st.avgHr  != null ? '' : 'none';
+  document.getElementById('stat-cad-row').style.display = st.avgCad != null ? '' : 'none';
+  if (st.avgHr  != null) document.getElementById('stat-hr').textContent  = st.avgHr + ' / ' + st.maxHr + ' bpm';
+  if (st.avgCad != null) document.getElementById('stat-cad').textContent = st.avgCad + ' rpm';
+}
+
+function setSelection(startIdx, endIdx) {
+  var n = currentDetail ? currentDetail.d.length : 0;
+  startIdx = Math.max(0, Math.min(n - 1, startIdx));
+  endIdx   = Math.max(0, Math.min(n - 1, endIdx));
+  if (startIdx > endIdx) { var tmp = startIdx; startIdx = endIdx; endIdx = tmp; }
+  selStartIdx = startIdx; selEndIdx = endIdx;
+  updateDashboardStats();
+  updateMapSelectionLayer();
+  allCharts().forEach(function (c) { c.update('none'); });
+}
+
+function updateMapSelectionLayer() {
+  if (highlightSelectionLayer) { map.removeLayer(highlightSelectionLayer); highlightSelectionLayer = null; }
+  if (currentTripIdx == null || selStartIdx == null || selEndIdx == null) return;
+  if (selEndIdx - selStartIdx < 1) return;
+  var coords = rawAll[currentTripIdx].slice(selStartIdx, selEndIdx + 1);
+  if (coords.length < 2) return;
+  var selColor = (sportColors && currentTripIdx != null && sportColors[tripSport(currentTripIdx)]) || '#1976d2';
+  highlightSelectionLayer = L.polyline(coords, { color: highlightColorFor(selColor), weight: 7, opacity: 1 }).addTo(map);
+  raiseHighlightLayers();
+}
+
+function indexForX(xs, xVal) {
+  if (!xs || !xs.length) return 0;
+  var lo = 0, hi = xs.length - 1;
+  while (lo < hi) { var mid = (lo + hi) >> 1; if (xs[mid] < xVal) lo = mid + 1; else hi = mid; }
+  if (lo > 0 && Math.abs(xs[lo - 1] - xVal) <= Math.abs(xs[lo] - xVal)) lo--;
+  return lo;
+}
+
+function pixelForIdx(chart, idx) { return chart.scales.x.getPixelForValue(currentXs[idx]); }
+
+function attachSlotListeners(canvas) {
+  canvas.addEventListener('mousedown', function (e) {
+    var chart = chartForCanvas(canvas);
+    if (!chart || !currentDetail) return;
+    var rect = canvas.getBoundingClientRect(), x = e.clientX - rect.left;
+    if (Math.abs(x - pixelForIdx(chart, selStartIdx)) <= SELECTION_HANDLE_PX) dragHandle = 'start';
+    else if (Math.abs(x - pixelForIdx(chart, selEndIdx)) <= SELECTION_HANDLE_PX) dragHandle = 'end';
+    else return;
+    dragChart = chart; dragCanvasRect = rect; e.preventDefault();
+  });
+  canvas.addEventListener('mousemove', function (e) {
+    if (dragHandle) return;
+    var chart = chartForCanvas(canvas);
+    if (!chart || !currentDetail) return;
+    var rect = canvas.getBoundingClientRect();
+    var x = e.clientX - rect.left;
+    var near = Math.abs(x - pixelForIdx(chart, selStartIdx)) <= SELECTION_HANDLE_PX ||
+               Math.abs(x - pixelForIdx(chart, selEndIdx))   <= SELECTION_HANDLE_PX;
+    canvas.style.cursor = near ? 'ew-resize' : '';
+    var xVal = chart.scales.x.getValueForPixel(x);
+    if (isFinite(xVal)) updateCursorAtX(xVal, chart);
+  });
+  canvas.addEventListener('mouseleave', function () {
+    if (!dragHandle) clearChartCursor();
+  });
+}
+document.addEventListener('mousemove', function (e) {
+  if (!dragHandle || !dragChart || !currentDetail) return;
+  var idx = indexForX(currentXs, dragChart.scales.x.getValueForPixel(e.clientX - dragCanvasRect.left));
+  if (dragHandle === 'start') setSelection(idx, selEndIdx); else setSelection(selStartIdx, idx);
+});
+document.addEventListener('mouseup', function () { dragHandle = null; dragChart = null; dragCanvasRect = null; });
+
+// ── dashboard rendering ───────────────────────────────────────────────────────
+var xMode = 'distance';
+
+function xValues(detail) {
+  return xMode === 'time'
+    ? detail.t.map(function (v) { return Math.round(v / 60 * 100) / 100; })
+    : detail.d.map(function (v) { return Math.round(v / 1000 * 100) / 100; });
+}
+
+function niceStep(total) {
+  if (!isFinite(total) || total <= 0) return 1;
+  var r = total / 8, p = Math.pow(10, Math.floor(Math.log10(r)));
+  for (var i = 0, b = [1, 2, 5, 10]; i < b.length; i++) if (r <= b[i] * p) return b[i] * p;
+  return 10 * p;
+}
+
+function buildDataset(detail, xArr, yKey, color, label, colorKey, maxSpeed) {
+  var ds = {
+    label: label, borderColor: color, backgroundColor: color,
+    pointRadius: 0, borderWidth: 1.5, tension: 0.1,
+    data: detail[yKey].map(function (v, i) { return { x: xArr[i], y: v }; })
+  };
+  if (colorKey) applyColorMode(ds, colorKey, color, maxSpeed || null);
+  return ds;
+}
+
+function renderDashboard() {
+  document.getElementById('dashboard-message').style.display = 'none';
+  var slotsEl = document.getElementById('dashboard-charts');
+  slotsEl.style.display = 'flex';
+
+  // Destroy existing charts
+  chartSlots.forEach(function (c) { if (c) c.destroy(); });
+  chartSlots = []; chartSlotMeta = [];
+  slotsEl.innerHTML = '';
+
+  var xs = xValues(currentDetail);
+  currentXs = xs;
+  if (selStartIdx == null || selEndIdx == null) { selStartIdx = 0; selEndIdx = xs.length - 1; }
+
+  var cxs = compareDetail ? xValues(compareDetail) : null;
+  compareXs = cxs;
+  var xMaxAll = Math.max(xs.length ? xs[xs.length - 1] : 0, cxs && cxs.length ? cxs[cxs.length - 1] : 0);
+  var step   = niceStep(xMaxAll);
+  var xLabel = xMode === 'time' ? 'Time (min)' : 'Distance (km)';
+
+  var sport = currentTripIdx != null ? tripSport(currentTripIdx) : 'Unknown';
+  var speedSuggestedMax = SPORT_SPEED_SCALE[sport] || 60;
+  if (compareDetail && compareTripIdx != null)
+    speedSuggestedMax = Math.max(speedSuggestedMax, SPORT_SPEED_SCALE[tripSport(compareTripIdx)] || 60);
+
+  var colorA = sportColors[sport] || '#1976d2';
+  var compareColor = compareColorFor(colorA);
+  var tripLabelA = tripMeta[currentTripIdx] ? tripMeta[currentTripIdx].date : 'A';
+  var tripLabelB = (compareTripIdx != null && tripMeta[compareTripIdx]) ? tripMeta[compareTripIdx].date : 'B';
+
+  // Which series have data in the primary trip (drives slot rendering)
+  var available = {
+    elev: true, spd: true,
+    hr:  !!currentDetail.hr,
+    cad: !!currentDetail.cad
+  };
+
+  // Build slot → [keys] mapping (sorted by slot index)
+  var slotSeries = {};
+  SERIES_KEYS.forEach(function (key) {
+    var s = slotAssignment[key];
+    if (s < 0 || !available[key]) return;
+    if (!slotSeries[s]) slotSeries[s] = [];
+    slotSeries[s].push(key);
+  });
+  var activeSlotIndices = Object.keys(slotSeries).map(Number).sort(function (a, b) { return a - b; });
+
+  // In compare mode, split any multi-series slot so each series gets its own chart
+  if (compareTripIdx != null) {
+    var splitSlots = {}, nextSI = 0;
+    activeSlotIndices.forEach(function (s) {
+      slotSeries[s].forEach(function (key) { splitSlots[nextSI++] = [key]; });
+    });
+    slotSeries = splitSlots;
+    activeSlotIndices = Object.keys(splitSlots).map(Number);
+  }
+
+  // Refresh layout panel if open (availability may have changed)
+  if (layoutPanelOpen) renderLayoutPanel();
+
+  activeSlotIndices.forEach(function (slotIdx) {
+    var keys = slotSeries[slotIdx];
+
+    // Create container + canvas
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'flex:1;min-width:0;';
+    var canvas = document.createElement('canvas');
+    canvas.id = 'chart-slot-' + slotIdx;
+    wrap.appendChild(canvas);
+    slotsEl.appendChild(wrap);
+
+    // Build datasets: all Trip-A first, then all Trip-B (for clean cursor indexing)
+    var datasetsA = [], datasetsB = [];
+    var scales = {
+      x: { type: 'linear', title: { display: true, text: xLabel },
+           min: 0, max: xMaxAll, ticks: { stepSize: step, precision: 0 } }
+    };
+
+    var yAxisIDs = ['y', 'y1', 'y2', 'y3'];
+    keys.forEach(function (key, ki) {
+      var yID    = yAxisIDs[ki] || 'y';
+      var dataK  = SERIES_DATA_KEY[key];
+      var yLabel = SERIES_Y_LABEL[key];
+      var spdMax = key === 'spd' ? speedSuggestedMax : null;
+
+      // Y axis scale
+      var yScale = { type: 'linear', position: ki % 2 === 0 ? 'left' : 'right',
+                     title: { display: true, text: yLabel } };
+      if (spdMax) yScale.suggestedMax = spdMax;
+      if (ki > 0) yScale.grid = { drawOnChartArea: false };
+      scales[yID] = yScale;
+
+      var seriesName = SERIES_LABEL[key];
+      var dsColor = (compareTripIdx != null) ? colorA : (SERIES_COLOR[key] || colorA);
+      var dsLabel = (compareTripIdx != null) ? tripLabelA : seriesName;
+
+      // Dataset A
+      if (currentDetail[dataK] !== undefined) {
+        var dsA = buildDataset(currentDetail, xs, dataK, dsColor, dsLabel, key, spdMax);
+        dsA.yAxisID = yID;
+        datasetsA.push(dsA);
+      }
+      // Dataset B (compare mode)
+      if (cxs && compareDetail && compareDetail[dataK] !== undefined) {
+        var dsB = buildDataset(compareDetail, cxs, dataK, compareColor, tripLabelB, null, spdMax);
+        dsB.yAxisID = yID;
+        datasetsB.push(dsB);
+      }
+    });
+
+    var datasets = datasetsA.concat(datasetsB);
+    if (!datasets.length) return;
+
+    var showLegend = (keys.length > 1) || (cxs != null);
+    var chart = new Chart(canvas, {
+      type: 'line',
+      data: { datasets: datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: false,
+        events: [],
+        plugins: {
+          legend: { display: showLegend },
+          tooltip: { enabled: true, callbacks: buildTooltipCallbacks(keys.length) }
+        },
+        scales: scales
+      }
+    });
+
+    // Store at the slot index position
+    while (chartSlots.length <= slotIdx) { chartSlots.push(null); chartSlotMeta.push(null); }
+    chartSlots[slotIdx] = chart;
+    chartSlotMeta[slotIdx] = { seriesCount: keys.length };
+
+    attachSlotListeners(canvas);
+  });
+
+  updateDashboardStats();
+  updateMapSelectionLayer();
+  if (compareDetail) updateCompareBar();
+}
+
+// ── chart cursor + map markers ────────────────────────────────────────────────
+function updateCursorAtX(xVal, sourceChart) {
+  var aIdx = currentXs ? indexForX(currentXs, xVal) : 0;
+  var bIdx = (compareDetail && compareXs) ? indexForX(compareXs, xVal) : null;
+
+  // Update crosshair pixel (same x-scale on both charts)
+  crosshairX = sourceChart.scales.x.getPixelForValue(xVal);
+
+  // Place map markers
+  if (currentTripIdx != null) {
+    var coords = rawAll[currentTripIdx];
+    if (coords && coords[aIdx]) {
+      var colorA = (sportColors && sportColors[tripSport(currentTripIdx)]) || '#1976d2';
+      if (!cursorMarker) {
+        cursorMarker = L.circleMarker(coords[aIdx], {
+          radius: 6, color: colorA, weight: 2, fillColor: '#fff', fillOpacity: 1
+        }).addTo(map);
+      } else { cursorMarker.setLatLng(coords[aIdx]); }
+    }
+  }
+  if (bIdx != null && compareTripIdx != null) {
+    var cCoords = rawAll[compareTripIdx];
+    if (cCoords && cCoords[bIdx]) {
+      if (!compareCursorMarker) {
+        compareCursorMarker = L.circleMarker(cCoords[bIdx], {
+          radius: 6, color: activeCompareColor, weight: 2, fillColor: '#fff', fillOpacity: 1
+        }).addTo(map);
+      } else { compareCursorMarker.setLatLng(cCoords[bIdx]); }
+    }
+  }
+
+  // Build tooltip active elements per slot (K series A + K series B)
+  chartSlots.forEach(function (chart, slotIdx) {
+    if (!chart) return;
+    var meta = chartSlotMeta[slotIdx];
+    var K = meta ? meta.seriesCount : 1;
+    var elems = [];
+    for (var i = 0; i < K; i++) elems.push({ datasetIndex: i, index: aIdx });
+    if (bIdx != null) for (var i = 0; i < K; i++) elems.push({ datasetIndex: K + i, index: bIdx });
+    chart.tooltip.setActiveElements(elems, { x: crosshairX, y: 0 });
+    chart.update('none');
+  });
+}
+
+function showCursorAtX(xVal) {
+  var charts = allCharts();
+  if (charts.length && isFinite(xVal)) updateCursorAtX(xVal, charts[0]);
+}
+
+function clearChartCursor() {
+  crosshairX = null;
+  if (cursorMarker)        { map.removeLayer(cursorMarker);        cursorMarker = null; }
+  if (compareCursorMarker) { map.removeLayer(compareCursorMarker); compareCursorMarker = null; }
+  allCharts().forEach(function (chart) {
+    chart.tooltip.setActiveElements([], { x: 0, y: 0 }); chart.update('none');
+  });
+}
+
+function onMapHover(idx, latlng) {
+  if (idx !== currentTripIdx || !currentDetail || !currentXs) return;
+  var coords = rawAll[idx], best = 0, bestD = Infinity;
+  for (var i = 0; i < coords.length; i++) {
+    var dl = coords[i][0] - latlng.lat, dm = coords[i][1] - latlng.lng;
+    var d = dl * dl + dm * dm; if (d < bestD) { bestD = d; best = i; }
+  }
+  showCursorAtX(currentXs[best]);
+}
+
+function onMapHoverCompare(idx, latlng) {
+  if (idx !== compareTripIdx || !compareDetail || !compareXs) return;
+  var coords = rawAll[idx], best = 0, bestD = Infinity;
+  for (var i = 0; i < coords.length; i++) {
+    var dl = coords[i][0] - latlng.lat, dm = coords[i][1] - latlng.lng;
+    var d = dl * dl + dm * dm; if (d < bestD) { bestD = d; best = i; }
+  }
+  showCursorAtX(compareXs[best]);
+}
+
+// ── trip detail loading ───────────────────────────────────────────────────────
+function loadTripDetail(idx, cb) {
+  if (customTripDetails) { cb(customTripDetails[idx] || null); return; }
+  var varName = 'tripDetail_' + idx;
+  if (window[varName]) { cb(window[varName]); return; }
+  var script = document.createElement('script');
+  script.src = dataBaseDir + 'trip_details/trip_' + idx + '.js';
+  script.onload  = function () { cb(window[varName]); };
+  script.onerror = function () { cb(null); };
+  document.head.appendChild(script);
+}
+
+// ── unselectTrip ──────────────────────────────────────────────────────────────
+function unselectTrip() {
+  if (highlightLayer) { map.removeLayer(highlightLayer); highlightLayer = null; }
+  disableMapDragSelect();
+  if (highlightSelectionLayer) { map.removeLayer(highlightSelectionLayer); highlightSelectionLayer = null; }
+  clearChartCursor();
+  clearComparison();
+  destroyAllCharts();
+  currentTripIdx = null; currentDetail = null; currentXs = null;
+  selStartIdx = null; selEndIdx = null;
+  currentTripCells = null;
+  if (tracksLayer) tracksLayer.redraw(); // restore full opacity
+}
+
+// ── dashboard buttons ─────────────────────────────────────────────────────────
+document.getElementById('dashboard-xtoggle').addEventListener('click', function () {
+  xMode = xMode === 'distance' ? 'time' : 'distance';
+  this.textContent = 'X: ' + (xMode === 'distance' ? 'Distance' : 'Time');
+  if (currentDetail) {
+    compareXs = compareDetail ? xValues(compareDetail) : null;
+    renderDashboard();
+  }
+});
+
+document.getElementById('dashboard-compare').addEventListener('click', function () {
+  if (comparePickMode) {
+    exitComparePickMode();
+  } else if (compareTripIdx != null) {
+    clearComparison();
+    renderDashboard();
+  } else {
+    enterComparePickMode('b');
+  }
+});
+
+
+document.getElementById('dashboard-back').addEventListener('click', function () {
+  unselectTrip();
+  exitComparePickMode();
+  document.getElementById('dashboard').classList.remove('visible');
+  document.getElementById('trip-list-wrap').style.display = 'block';
+});
+
+document.getElementById('dashboard-close').addEventListener('click', function () {
+  document.getElementById('dashboard').classList.remove('visible');
+  unselectTrip();
+  exitComparePickMode();
+  if (clickCircle) { map.removeLayer(clickCircle); clickCircle = null; }
+  document.getElementById('trip-list-wrap').style.display = 'none';
+});
+
+// ── filters ───────────────────────────────────────────────────────────────────
+document.getElementById('show-tracks').addEventListener('change', function (e) {
+  showTracks = e.target.checked; if (tracksLayer) tracksLayer.redraw();
+});
+document.getElementById('track-width').addEventListener('input', function ()  { if (tracksLayer) tracksLayer.redraw(); });
+document.getElementById('track-opacity').addEventListener('input', function () { if (tracksLayer) tracksLayer.redraw(); });
+document.getElementById('click-radius').addEventListener('input', updateClickRadiusLabel);
+
+// ── initApp ───────────────────────────────────────────────────────────────────
+function initApp(data) {
+  if (highlightLayer) { map.removeLayer(highlightLayer); highlightLayer = null; }
+  disableMapDragSelect();
+  if (clickCircle) { map.removeLayer(clickCircle); clickCircle = null; }
+  clearChartCursor();
+  clearComparison();
+  destroyAllCharts();
+  currentTripIdx = null; currentDetail = null; currentTripCells = null;
+  document.getElementById('dashboard').classList.remove('visible');
+  document.getElementById('dashboard-message').style.display = 'none';
+  document.getElementById('dashboard-charts').style.display = 'flex';
+  if (tracksLayer) { map.removeLayer(tracksLayer); tracksLayer = null; }
+  rawGrid = null;
+
+  rawAll   = data.rawAll;
+  tripMeta = data.tripMeta;
+
+  allSports    = Array.from(new Set(tripMeta.map(function (_, i) { return tripSport(i); }))).sort();
+  activeSports = new Set(allSports);
+  sportColors  = {};
+  allSports.forEach(function (s) { sportColors[s] = DEFAULT_SPORT_COLORS[s] || '#999'; });
+
+  var sfEl = document.getElementById('sport-filters');
+  sfEl.innerHTML = '';
+  allSports.forEach(function (sport) {
+    var label = document.createElement('label'); label.className = 'row';
+    var cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = true;
+    cb.addEventListener('change', function () {
+      if (cb.checked) activeSports.add(sport); else activeSports.delete(sport);
+      if (tracksLayer) tracksLayer.redraw();
+    });
+    label.appendChild(cb);
+    var ci = document.createElement('input'); ci.type = 'color'; ci.value = sportColors[sport];
+    ci.addEventListener('input', function () { sportColors[sport] = ci.value; if (tracksLayer) tracksLayer.redraw(); });
+    label.appendChild(ci);
+    label.appendChild(document.createTextNode(' ' + sport));
+    sfEl.appendChild(label);
+  });
+
+  document.getElementById('trip-list-wrap').style.display = 'none';
+  setLoadingProgress('Indexing GPS tracks...', 0.4);
+  setTimeout(function () {
+    rawGrid = buildRawGrid(rawAll);
+    var bounds = L.latLngBounds([]);
+    for (var i = 0; i < rawAll.length; i++)
+      for (var p = 0; p < rawAll[i].length; p++) bounds.extend(rawAll[i][p]);
+    setLoadingProgress('Rendering...', 0.8);
+    setTimeout(function () {
+      tracksLayer = new TracksCanvasLayer(); tracksLayer.addTo(map); raiseHighlightLayers();
+      if (bounds.isValid()) map.fitBounds(bounds);
+      updateClickRadiusLabel();
+      hideLoading();
+    }, 0);
+  }, 0);
+}
+
+// ── data loading ──────────────────────────────────────────────────────────────
+function loadScript(src) {
+  return new Promise(function (res, rej) {
+    var s = document.createElement('script'); s.src = src;
+    s.onload = res; s.onerror = rej; document.head.appendChild(s);
+  });
+}
+
+function loadDefaultData() {
+  setLoadingProgress('Downloading trip data...', 0);
+  loadScript(dataBaseDir + 'raw_data.js').then(function () {
+    customTripDetails = null;
+    setLoadingProgress('Preparing map layers...', 0.2);
+    initApp({ rawAll: rawAll, tripMeta: tripMeta });
+    document.getElementById('data-folder-label').textContent = 'Loaded from: ' + dataBaseDir;
+  }).catch(function () {
+    document.getElementById('data-folder-label').textContent =
+      'Could not load data from ' + dataBaseDir + ' — use "Select data folder..." to load manually.';
+    showLoadingError(
+      'Could not load data from "' + dataBaseDir + '".<br>' +
+      'Use "Select data folder..." to load it manually, or open this page via Trip Manager.'
+    );
+  });
+}
+
+function parseVarFile(text) {
+  var result = {};
+  text.split(/;\s*\n/).forEach(function (chunk) {
+    chunk = chunk.trim(); if (chunk.slice(0, 4) !== 'var ') return;
+    var eq = chunk.indexOf('='); if (eq === -1) return;
+    var name = chunk.slice(4, eq).trim(), val = chunk.slice(eq + 1).trim();
+    if (val.endsWith(';')) val = val.slice(0, -1);
+    try { result[name] = JSON.parse(val); } catch (e) {}
+  });
+  return result;
+}
+
+function readFileText(file) {
+  return new Promise(function (res, rej) {
+    var r = new FileReader(); r.onload = function () { res(r.result); }; r.onerror = rej;
+    r.readAsText(file);
+  });
+}
+
+document.getElementById('folder-picker-btn').addEventListener('click', function () {
+  document.getElementById('folder-picker').click();
+});
+
+document.getElementById('folder-picker').addEventListener('change', function (e) {
+  var files = Array.from(e.target.files);
+  var rawFile    = files.find(function (f) { return /(^|[\\/])raw_data\.js$/.test(f.webkitRelativePath); });
+  var detailFiles = files.filter(function (f) { return /trip_details[\\/]trip_\d+\.js$/.test(f.webkitRelativePath); });
+  if (!rawFile) { alert('Selected folder must contain raw_data.js (the output of combine_trips.py).'); return; }
+  var folderName = rawFile.webkitRelativePath.split(/[\\/]/)[0];
+  document.getElementById('loading-overlay').classList.remove('hidden');
+  document.getElementById('loading-box').classList.remove('error');
+  setLoadingProgress('Reading files...', 0);
+  Promise.all([readFileText(rawFile)].concat(detailFiles.map(readFileText))).then(function (texts) {
+    var rd = parseVarFile(texts[0]);
+    var details = {};
+    detailFiles.forEach(function (f, i) {
+      var m = f.name.match(/trip_(\d+)\.js$/); if (!m) return;
+      var p = parseVarFile(texts[1 + i]), k = Object.keys(p)[0];
+      if (k) details[Number(m[1])] = p[k];
+    });
+    customTripDetails = details;
+    initApp({ rawAll: rd.rawAll, tripMeta: rd.tripMeta });
+    document.getElementById('data-folder-label').textContent =
+      'Loaded from: ' + folderName + '/ (' + detailFiles.length + ' trip detail file(s))';
+  });
+});
+
+loadDefaultData();
+</script>
+</body>
+</html>
