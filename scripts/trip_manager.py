@@ -53,9 +53,18 @@ def resolve_data_dir():
     library, processed output, Komoot credentials), prompting the user to
     choose or create one on first run.
 
+    Set the ``TRIPMANAGER_DATA_DIR`` environment variable to bypass the GUI
+    dialog entirely (used by the test suite and CI).
+
     Each program installation (identified by its directory path) remembers
     its own data folder so that two copies of Trip Manager installed in
     different locations can each manage a separate GPS library."""
+    env_override = os.environ.get("TRIPMANAGER_DATA_DIR")
+    if env_override:
+        os.makedirs(os.path.join(env_override, "raw_gpx"), exist_ok=True)
+        os.makedirs(os.path.join(env_override, "processed"), exist_ok=True)
+        return env_override
+
     config = load_config()
     # Per-installation lookup: data_dirs is a dict keyed by program directory.
     data_dirs = config.get("data_dirs", {})
@@ -108,45 +117,16 @@ else:
     _VENV_PYTHON = os.path.join(DIR, "env", "Scripts", "python.exe")
     PYTHON_FOR_COMBINE = _VENV_PYTHON if os.path.exists(_VENV_PYTHON) else sys.executable
 
-NAME_RE = re.compile(r'^(\d{4}-\d{2}-\d{2})_')
-ID_RE = re.compile(r'-(\d+)\.gpx$', re.IGNORECASE)
-TITLE_RE = re.compile(r'^\d{4}-\d{2}-\d{2}_(.+)-\d+\.gpx$', re.IGNORECASE)
-DATETIME_SUFFIX_RE = re.compile(r'\s+\d{2}\.\d{2}\.\d{4}\s+\d{3,4}$')
-
-# Keep in sync with combine_trips.py's trip_sport().
-SPORT_CATEGORIES = ["Bike", "Run", "Walking", "Ski", "Swimming"]
-SPORT_KEYWORDS = [
-    (re.compile(r'v[ée]lo|vtt|cyclisme|gravel|mtb|giro', re.IGNORECASE), "Bike"),
-    (re.compile(r'ski', re.IGNORECASE), "Ski"),
-    (re.compile(r'natation|nage|swim', re.IGNORECASE), "Swimming"),
-    (re.compile(r'course|running', re.IGNORECASE), "Run"),
-    (re.compile(r'randonn|marche|hiking|walk', re.IGNORECASE), "Walking"),
-]
+# Pure parsing utilities live in trip_utils (no GUI, safe to import anywhere)
+from trip_utils import (
+    NAME_RE, ID_RE, TITLE_RE, DATETIME_SUFFIX_RE, _GPX_META_RE,
+    SPORT_CATEGORIES, SPORT_KEYWORDS,
+    trip_id, trip_date, read_gpx_meta, trip_sport,
+)
 
 # Regexes for parsing combine_trips.py's stderr/stdout progress lines
 PROCESSING_COUNT_RE = re.compile(r'^Processing (\d+) files')
 PER_FILE_RE = re.compile(r'^  .+ points -> ')
-
-
-def trip_id(filename):
-    m = ID_RE.search(filename)
-    return m.group(1) if m else None
-
-
-def trip_date(filename):
-    m = NAME_RE.match(filename)
-    return m.group(1) if m else ""
-
-
-def trip_sport(filename):
-    """Activity category derived from the file name's title, restricted to
-    SPORT_CATEGORIES (Bike/Run/Walking/Ski/Swimming)."""
-    m = TITLE_RE.match(filename)
-    title = DATETIME_SUFFIX_RE.sub('', m.group(1)).strip() if m else ""
-    for pattern, category in SPORT_KEYWORDS:
-        if pattern.search(title):
-            return category
-    return "Bike"
 
 
 def list_trips():
@@ -227,6 +207,87 @@ def load_processed_meta(raw_data_path):
     return {}
 
 
+class AutoImportConfirmDialog(tk.Toplevel):
+    """Shown after auto-check finds new trips; lets the user pick which to download."""
+
+    def __init__(self, master, provider_name, trips, result_list, done_event):
+        super().__init__(master)
+        self.title(f"New trips found — {provider_name}")
+        self.resizable(True, True)
+        self.grab_set()
+        self.protocol("WM_DELETE_WINDOW", self._skip)
+        self._result_list = result_list
+        self._done_event  = done_event
+        self._vars = []
+
+        ttk.Label(self, text=f"{len(trips)} new trip(s) found on {provider_name}:",
+                  font=("", 10, "bold")).pack(padx=12, pady=(10, 4), anchor="w")
+
+        # Scrollable checklist
+        list_frame = ttk.Frame(self)
+        list_frame.pack(fill="both", expand=True, padx=12)
+        vsb = ttk.Scrollbar(list_frame, orient="vertical")
+        canvas = tk.Canvas(list_frame, yscrollcommand=vsb.set, bd=0, highlightthickness=0, height=320)
+        vsb.configure(command=canvas.yview)
+        vsb.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+        inner = ttk.Frame(canvas)
+        canvas.create_window((0, 0), window=inner, anchor="nw")
+        inner.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+
+        # Header row
+        hdr = ttk.Frame(inner)
+        hdr.pack(fill="x", padx=4, pady=(0, 2))
+        tk.Label(hdr, text="", width=3).pack(side="left")
+        tk.Label(hdr, text="Date",     width=11, anchor="w", font=("", 9, "bold")).pack(side="left")
+        tk.Label(hdr, text="Name",     anchor="w",           font=("", 9, "bold")).pack(side="left", expand=True, fill="x")
+        tk.Label(hdr, text="Dist (km)",width=9,  anchor="e", font=("", 9, "bold")).pack(side="left")
+        tk.Label(hdr, text="Sport",    width=12, anchor="w", font=("", 9, "bold")).pack(side="left")
+        ttk.Separator(inner, orient="horizontal").pack(fill="x")
+
+        for tid, meta in trips:
+            var = tk.BooleanVar(value=True)
+            self._vars.append((tid, meta, var))
+            row = ttk.Frame(inner)
+            row.pack(fill="x", padx=4, pady=1)
+            ttk.Checkbutton(row, variable=var).pack(side="left")
+            date    = (meta.get("date") or "")[:10]
+            dist_km = round((meta.get("distance") or 0) / 1000.0, 1)
+            sport   = meta.get("sport", "")
+            tk.Label(row, text=date,                   width=11, anchor="w").pack(side="left")
+            tk.Label(row, text=meta.get("name", ""),   anchor="w").pack(side="left", expand=True, fill="x")
+            tk.Label(row, text=f"{dist_km}",           width=9,  anchor="e").pack(side="left")
+            tk.Label(row, text=sport,                  width=12, anchor="w").pack(side="left")
+
+        ttk.Separator(inner, orient="horizontal").pack(fill="x", pady=(2, 0))
+
+        # Button bar
+        btns = ttk.Frame(self)
+        btns.pack(fill="x", padx=12, pady=8)
+        ttk.Button(btns, text="Select all",      command=self._select_all ).pack(side="left")
+        ttk.Button(btns, text="Select none",     command=self._select_none).pack(side="left", padx=(6, 0))
+        ttk.Button(btns, text="Skip all",        command=self._skip       ).pack(side="right")
+        ttk.Button(btns, text="Import selected", command=self._confirm    ).pack(side="right", padx=(0, 6))
+
+        self.update_idletasks()
+        self.minsize(580, 300)
+
+    def _select_all(self):
+        for _, _, v in self._vars: v.set(True)
+
+    def _select_none(self):
+        for _, _, v in self._vars: v.set(False)
+
+    def _confirm(self):
+        self._result_list.extend((tid, meta) for tid, meta, v in self._vars if v.get())
+        self._done_event.set()
+        self.destroy()
+
+    def _skip(self):
+        self._done_event.set()
+        self.destroy()
+
+
 class TripManager(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -272,19 +333,20 @@ class TripManager(tk.Tk):
         self.list_frame = list_frame = ttk.Frame(self)
         list_frame.pack(fill="both", expand=True, padx=10)
 
-        columns = ("date", "name", "id", "sport", "distance", "status")
+        columns = ("date", "name", "id", "sport", "source", "distance", "status")
         self.tree = ttk.Treeview(list_frame, columns=columns, show="headings", selectmode="extended", height=4)
         self.sort_state = {}  # column -> last sort was reverse?
         self.column_labels = {
             "date": "Date", "name": "File name", "id": "ID",
-            "sport": "Sport", "distance": "Distance (km)", "status": "Status",
+            "sport": "Sport", "source": "Source", "distance": "Distance (km)", "status": "Status",
         }
         for col, label in self.column_labels.items():
             self.tree.heading(col, text=label, command=lambda c=col: self.sort_by_column(c))
         self.tree.column("date", width=90, anchor="w")
-        self.tree.column("name", width=380, anchor="w")
+        self.tree.column("name", width=330, anchor="w")
         self.tree.column("id", width=80, anchor="w")
         self.tree.column("sport", width=80, anchor="w")
+        self.tree.column("source", width=70, anchor="w")
         self.tree.column("distance", width=90, anchor="e")
         self.tree.column("status", width=80, anchor="w")
 
@@ -300,6 +362,7 @@ class TripManager(tk.Tk):
         ttk.Button(btns, text="Add files...", command=self.add_files).pack(side="left")
         ttk.Button(btns, text="Add folder...", command=self.add_folder).pack(side="left", padx=(6, 0))
         ttk.Button(btns, text="Remove selected", command=self.remove_selected).pack(side="left", padx=(6, 0))
+        ttk.Button(btns, text="Remove all", command=self.remove_all).pack(side="left", padx=(6, 0))
         ttk.Button(btns, text="Refresh", command=self.refresh).pack(side="left", padx=(6, 0))
 
         self.show_log_var = tk.BooleanVar(value=True)
@@ -460,9 +523,12 @@ class TripManager(tk.Tk):
             status = "Processed" if meta else "New"
             if status == "New":
                 new_count += 1
-            sport = meta.get("sport") if meta else trip_sport(f)
+            fpath = os.path.join(SOURCE_DIR, f)
+            src_meta, sport_meta = read_gpx_meta(fpath)
+            sport = (meta.get("sport") if meta else None) or sport_meta or trip_sport(f)
+            source = (meta.get("source") if meta else None) or src_meta
             distance = f"{meta['distanceKm']:.1f}" if meta and meta.get("distanceKm") is not None else ""
-            self.tree.insert("", "end", values=(trip_date(f), f, trip_id(f) or "", sport, distance, status))
+            self.tree.insert("", "end", values=(trip_date(f), f, trip_id(f) or "", sport, source, distance, status))
         self.count_var.set(
             f"Trips recorded: {len(files)} ({len(files) - new_count} processed, {new_count} new)"
         )
@@ -554,9 +620,18 @@ class TripManager(tk.Tk):
                 def _done(n, k=key):
                     if n > 0:
                         self.after(0, self.refresh)
+
+                def _show_confirm(provider_name, trips, _master=self):
+                    result = []
+                    event  = threading.Event()
+                    _master.after(0, lambda: AutoImportConfirmDialog(
+                        _master, provider_name, trips, result, event))
+                    event.wait()
+                    return result
+
                 thread = threading.Thread(
                     target=cls._run_headless,
-                    args=(self._log, _done),
+                    args=(self._log, _done, _show_confirm),
                     daemon=True,
                 )
                 thread.start()
@@ -629,6 +704,23 @@ class TripManager(tk.Tk):
                 os.remove(path)
             except OSError as e:
                 messagebox.showerror("Remove trips", f"Could not delete {name}:\n{e}")
+        self.refresh()
+
+    def remove_all(self):
+        files = list_trips()
+        if not files:
+            return
+        if not messagebox.askyesno(
+            "Remove all trips",
+            f"Delete ALL {len(files)} trip file(s) from the library? This cannot be undone."
+        ):
+            return
+        for name in files:
+            path = os.path.join(SOURCE_DIR, name)
+            try:
+                os.remove(path)
+            except OSError as e:
+                messagebox.showerror("Remove all trips", f"Could not delete {name}:\n{e}")
         self.refresh()
 
     # ------------------------------------------------------------------ filter

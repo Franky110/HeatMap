@@ -12,7 +12,8 @@ import gzip
 import tkinter as tk
 from tkinter import ttk, messagebox
 
-from trip_manager import SOURCE_DIR, list_trips, trip_date, trip_sport, SPORT_CATEGORIES
+from trip_manager import SOURCE_DIR, list_trips, trip_date
+from trip_utils import trip_sport, read_gpx_meta, SPORT_CATEGORIES, gpx_sensors
 
 
 # ---------------------------------------------------------------------------
@@ -197,6 +198,41 @@ def _reindex_trip_details(output_dir, old_to_new):
 
 
 # ---------------------------------------------------------------------------
+# Duplicate detection (pure, no GUI — testable in isolation)
+# ---------------------------------------------------------------------------
+def find_duplicate_pairs(rows):
+    """Return (dup_names: set, pairs: list of (row_a, row_b)).
+
+    Two trips are considered likely duplicates when they share the same date
+    and their distances are both known and within 5 % of each other.
+    """
+    by_date = {}
+    for row in rows:
+        by_date.setdefault(row["date"] or "", []).append(row)
+
+    dup_names = set()
+    groups = []
+    for date_rows in by_date.values():
+        if len(date_rows) < 2:
+            continue
+        for i in range(len(date_rows)):
+            for j in range(i + 1, len(date_rows)):
+                a, b = date_rows[i], date_rows[j]
+                da, db = a["distance"], b["distance"]
+                if da is None or db is None:
+                    similar = False
+                else:
+                    ref = max(da, db)
+                    similar = ref == 0 or abs(da - db) / ref <= 0.05
+                if similar:
+                    dup_names.add(a["name"])
+                    dup_names.add(b["name"])
+                    groups.append((a, b))
+
+    return dup_names, groups
+
+
+# ---------------------------------------------------------------------------
 # GUI
 # ---------------------------------------------------------------------------
 class DataWizardWindow(tk.Toplevel):
@@ -268,17 +304,19 @@ class DataWizardWindow(tk.Toplevel):
         list_frame = ttk.Frame(self)
         list_frame.pack(fill="both", expand=True, padx=10)
 
-        columns = ("date", "name", "sport", "distance", "status")
+        columns = ("date", "name", "sport", "source", "sensors", "distance", "status")
         self.tree = ttk.Treeview(list_frame, columns=columns, show="headings", selectmode="extended")
-        headers = {"date": "Date", "name": "File name", "sport": "Sport",
-                   "distance": "Distance (km)", "status": "Status"}
+        headers = {"date": "Date", "name": "File name", "sport": "Sport", "source": "Source",
+                   "sensors": "Sensors", "distance": "Dist (km)", "status": "Status"}
         for col, label in headers.items():
             self.tree.heading(col, text=label, command=lambda c=col: self.sort_by_column(c))
-        self.tree.column("date", width=90, anchor="w")
-        self.tree.column("name", width=420, anchor="w")
-        self.tree.column("sport", width=90, anchor="w")
-        self.tree.column("distance", width=100, anchor="e")
-        self.tree.column("status", width=110, anchor="w")
+        self.tree.column("date",     width=90,  anchor="w")
+        self.tree.column("name",     width=310, anchor="w")
+        self.tree.column("sport",    width=75,  anchor="w")
+        self.tree.column("source",   width=62,  anchor="w")
+        self.tree.column("sensors",  width=85,  anchor="w")
+        self.tree.column("distance", width=75,  anchor="e")
+        self.tree.column("status",   width=100, anchor="w")
         self.sort_state = {}
 
         vsb = ttk.Scrollbar(list_frame, orient="vertical", command=self.tree.yview)
@@ -293,6 +331,7 @@ class DataWizardWindow(tk.Toplevel):
         ttk.Button(btns, text="Delete raw GPX", command=self.delete_raw).pack(side="left")
         ttk.Button(btns, text="Delete processed data", command=self.delete_processed).pack(side="left", padx=(6, 0))
         ttk.Button(btns, text="Delete both", command=self.delete_both).pack(side="left", padx=(6, 0))
+        ttk.Button(btns, text="Find duplicates", command=self.find_duplicates).pack(side="left", padx=(6, 0))
         ttk.Button(btns, text="Refresh", command=self.refresh).pack(side="left", padx=(6, 0))
         ttk.Button(btns, text="Close", command=self.destroy).pack(side="right")
 
@@ -346,7 +385,18 @@ class DataWizardWindow(tk.Toplevel):
                 sport = trip_sport(name)
                 distance = None
 
-            rows.append({"name": name, "date": date, "sport": sport, "distance": distance, "status": status})
+            source = meta.get("source", "") if proc else ""
+            fpath = os.path.join(SOURCE_DIR, name)
+            sensors = ""
+            if os.path.exists(fpath):
+                src_meta, sport_meta = read_gpx_meta(fpath)
+                if not source:
+                    source = src_meta
+                if not sport and sport_meta:
+                    sport = sport_meta
+                sensors = gpx_sensors(fpath)
+            rows.append({"name": name, "date": date, "sport": sport, "distance": distance,
+                         "status": status, "source": source, "sensors": sensors})
 
         self.all_rows = rows
         self.sport_combo["values"] = ("All",) + tuple(SPORT_CATEGORIES)
@@ -387,7 +437,8 @@ class DataWizardWindow(tk.Toplevel):
 
             dist_str = f"{dist:.1f}" if dist is not None else ""
             self.tree.insert("", "end", iid=row["name"], values=(
-                row["date"], row["name"], row["sport"], dist_str, row["status"],
+                row["date"], row["name"], row["sport"], row.get("source", ""),
+                row.get("sensors", ""), dist_str, row["status"],
             ))
             shown += 1
 
@@ -407,6 +458,40 @@ class DataWizardWindow(tk.Toplevel):
     def _notify_changed(self):
         if self.on_changed:
             self.on_changed()
+
+    # ---------------------------------------------------------------- duplicates
+    _PAIR_COLORS = [
+        '#FFF9C4', '#C8E6C9', '#BBDEFB', '#F8BBD0',
+        '#FFE0B2', '#E1BEE7', '#B2EBF2', '#DCEDC8',
+    ]
+
+    def find_duplicates(self):
+        """Highlight likely duplicate trips in the tree, one color per pair."""
+        dup_names, groups = find_duplicate_pairs(self.all_rows)
+
+        if not groups:
+            messagebox.showinfo("Find duplicates", "No likely duplicates found.")
+            return
+
+        visible = set(self.tree.get_children(""))
+        for pair_idx, (a, b) in enumerate(groups):
+            tag = f'dup_pair_{pair_idx}'
+            color = self._PAIR_COLORS[pair_idx % len(self._PAIR_COLORS)]
+            self.tree.tag_configure(tag, background=color)
+            for name in (a["name"], b["name"]):
+                if name in visible:
+                    existing = self.tree.item(name, "tags")
+                    self.tree.item(name, tags=tuple(existing) + (tag,))
+
+        lines = [f"{len(groups)} likely duplicate pair(s) found ({len(dup_names)} trip(s)):\n"]
+        for a, b in groups[:20]:
+            da = f"{a['distance']:.1f} km" if a["distance"] is not None else "?"
+            db = f"{b['distance']:.1f} km" if b["distance"] is not None else "?"
+            lines.append(f"  {a['date']}  {da}  ←→  {db}  [{a['source'] or '?'} / {b['source'] or '?'}]")
+        if len(groups) > 20:
+            lines.append(f"  ... and {len(groups) - 20} more")
+        lines.append("\nPairs are color-coded in the list. Use Delete buttons to remove them.")
+        messagebox.showinfo("Find duplicates", "\n".join(lines))
 
     def delete_raw(self):
         names = [n for n in self.tree.selection() if self._row_status(n) in ("Raw only", "Both")]

@@ -11,12 +11,14 @@ each trip's elevation, speed, heart rate, and cadence in an interactive dashboar
 ![Import window](docs/HeatMapMainWindow.png)
 - **Heatmap** — all your trips overlaid on an interactive map (Leaflet + OpenStreetMap)
 ![Heatmap](docs/HeatMapHTML.png)
-- **Trips** — See all your trips passing throught a certain location
+- **Trips** — See all your trips passing through a certain location
 ![Trips](docs/TripsSelector.png)
-- **Dashboard** — per-trip charts for elevation, speed, heart rate, and cadence with a flexible layout (stack or combine any series, dual Y-axes)
-- **Compare mode** — overlay two trips side by side to compare pace, elevation, and more
+- **Dashboard** — per-trip charts for elevation, speed, heart rate, cadence, and power with a flexible layout (stack or combine any series, dual Y-axes)
+- **Segments** — define named stretches of road/trail and see a leaderboard of all trips through them, ranked fastest to slowest; compare two efforts side by side on the segment
+- **Compare mode** — overlay two trips (or two segment efforts) side by side to compare pace, elevation, power, and more
 - **X-axis toggle** — switch between distance and time on all charts at once
 - **Color modes** — line, gradient fill, or value-based coloring (green → red by speed)
+- **Data Wizard** — inspect and clean your trip library: filter by sport/date/source/sensor, detect color-coded duplicate pairs, delete raw or processed files
 - **Self-contained viewer** — `combined.html` works in any browser with no server required for offline use, or via the built-in local server for compressed data
 
 ## Requirements

@@ -130,6 +130,105 @@
   .trip-list-item.compare-pick { padding-left: 4px; border-left: 3px solid #f9a825; }
 
   .drag-selecting, .drag-selecting * { cursor: crosshair !important; }
+
+  /* ── Segments ─────────────────────────────────────────────────────────────── */
+  #seg-btn {
+    background: #FC4C02; color: white; border: none; border-radius: 3px;
+    padding: 4px 10px; cursor: pointer; font-size: 12px; font-family: sans-serif;
+  }
+  #seg-btn:hover { background: #e04400; }
+
+  #segments-panel {
+    position: absolute; left: 10px; top: 10px; z-index: 1001;
+    background: white; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.32);
+    font-family: sans-serif; font-size: 13px; width: 310px;
+    max-height: calc(100vh - 30px); display: none; flex-direction: column; overflow: hidden;
+  }
+  #segments-panel.visible { display: flex; }
+
+  .seg-header {
+    background: #FC4C02; color: white; padding: 10px 14px; border-radius: 8px 8px 0 0;
+    display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+  }
+  .seg-header strong { flex: 1; font-size: 14px; letter-spacing: 0.3px; }
+  .seg-header button {
+    background: rgba(255,255,255,0.25); color: white; border: none; border-radius: 4px;
+    padding: 2px 8px; cursor: pointer; font-size: 14px; line-height: 1.2;
+  }
+  .seg-header button:hover { background: rgba(255,255,255,0.4); }
+
+  .seg-body { overflow-y: auto; padding: 8px; flex: 1; min-height: 0; }
+
+  .seg-create-bar {
+    padding: 8px 10px; border-bottom: 1px solid #eee;
+    display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+  }
+  .seg-create-bar button {
+    background: #FC4C02; color: white; border: none; border-radius: 4px;
+    padding: 5px 10px; cursor: pointer; font-size: 12px; white-space: nowrap;
+  }
+  .seg-create-bar button:hover { background: #e04400; }
+  .seg-create-bar button.seg-cancel { background: #757575; }
+  .seg-create-bar button.seg-cancel:hover { background: #616161; }
+  .seg-create-hint { font-size: 11px; color: #555; flex: 1; line-height: 1.4; }
+
+  .seg-step-dot {
+    display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+    vertical-align: middle; margin-right: 4px;
+  }
+  .seg-step-dot.start { background: #4CAF50; }
+  .seg-step-dot.end   { background: #FC4C02; }
+
+  .seg-card {
+    border: 1px solid #e0e0e0; border-radius: 6px; padding: 9px 11px; margin-bottom: 6px;
+    cursor: pointer; transition: border-color 0.15s, background 0.15s;
+  }
+  .seg-card:hover { border-color: #FC4C02; background: #fff9f7; }
+  .seg-card.active { border-color: #FC4C02; background: #fff5f2; }
+  .seg-card-name { font-weight: 600; color: #222; margin-bottom: 3px; font-size: 13px; }
+  .seg-card-meta { font-size: 11px; color: #999; }
+  .seg-card-actions { display: flex; gap: 4px; margin-top: 7px; flex-wrap: wrap; }
+  .seg-card-actions button {
+    font-size: 11px; padding: 2px 8px; border: 1px solid #ddd; border-radius: 3px;
+    cursor: pointer; background: white; color: #555; transition: border-color 0.1s, color 0.1s;
+  }
+  .seg-card-actions button:hover { border-color: #FC4C02; color: #FC4C02; }
+  .seg-card-actions button.seg-del { color: #c62828; border-color: #f5c6c6; }
+  .seg-card-actions button.seg-del:hover { background: #fff0f0; border-color: #c62828; }
+
+  .seg-empty { color: #aaa; text-align: center; padding: 28px 10px; font-size: 12px; line-height: 1.7; }
+
+  /* Leaderboard */
+  .seg-lb-header {
+    padding: 9px 12px 8px; display: flex; align-items: center; gap: 8px;
+    border-bottom: 2px solid #FC4C02; flex-shrink: 0;
+  }
+  .seg-lb-title { font-weight: 700; font-size: 13px; flex: 1; color: #222; }
+  .seg-lb-back {
+    background: none; border: none; cursor: pointer; font-size: 20px; color: #aaa;
+    padding: 0; line-height: 1; transition: color 0.1s;
+  }
+  .seg-lb-back:hover { color: #FC4C02; }
+  .seg-lb-sub { font-size: 11px; color: #aaa; padding: 4px 12px 6px; flex-shrink: 0; }
+
+  .seg-lb-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .seg-lb-table th {
+    color: #999; font-weight: 500; padding: 4px 7px; text-align: left;
+    border-bottom: 1px solid #eee; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px;
+  }
+  .seg-lb-table td { padding: 6px 7px; border-bottom: 1px solid #f5f5f5; }
+  .seg-lb-table tr:hover td { background: #fff5f2; cursor: pointer; }
+  .lb-rank { width: 30px; text-align: center; }
+  .lb-time { font-variant-numeric: tabular-nums; font-weight: 600; color: #222; }
+  .lb-date { color: #555; }
+  .lb-speed { color: #999; font-size: 11px; }
+  .lb-medal-1 { color: #FFD700; font-size: 15px; }
+  .lb-medal-2 { color: #A8A9AD; font-size: 15px; }
+  .lb-medal-3 { color: #CD7F32; font-size: 15px; }
+  .lb-num { color: #bbb; font-size: 12px; }
+  .lb-pr { color: #FC4C02; font-size: 10px; font-weight: 700; vertical-align: super; margin-left: 2px; }
+
+  .seg-pick-mode * { cursor: crosshair !important; }
 </style>
 </head>
 <body>
@@ -168,6 +267,10 @@
   <strong>Sport type</strong> <span style="font-size:11px;color:#777;">(colors editable)</span>
   <div id="sport-filters"></div>
   <hr>
+  <div class="row">
+    <button id="seg-btn" type="button" onclick="openSegPanel()">◆ Segments</button>
+  </div>
+  <hr>
   <label class="row">
     <span style="width:80px">Click radius</span>
     <input type="range" id="click-radius" min="5" max="80" step="5" value="20">
@@ -183,6 +286,8 @@
     <div id="trip-list" style="max-height:220px;overflow-y:auto;margin-top:6px;"></div>
   </div>
 </div>
+
+<div id="segments-panel"></div>
 
 <div id="dashboard">
   <div id="dashboard-header">
@@ -217,6 +322,7 @@
         <div class="stat"><span class="stat-label">Min / Max ele</span><span id="stat-ele-range" class="stat-value">-</span></div>
         <div class="stat" id="stat-hr-row" style="display:none"><span class="stat-label">Avg / Max HR</span><span id="stat-hr" class="stat-value">-</span></div>
         <div class="stat" id="stat-cad-row" style="display:none"><span class="stat-label">Avg cadence</span><span id="stat-cad" class="stat-value">-</span></div>
+        <div class="stat" id="stat-pwr-row" style="display:none"><span class="stat-label">Avg power</span><span id="stat-pwr" class="stat-value">-</span></div>
       </div>
     </div>
     <div id="compare-col-b" class="compare-col" style="display:none">
@@ -236,6 +342,7 @@
         <div class="stat"><span class="stat-label">Min / Max ele</span><span class="stat-value"><span id="stat-b-ele-range">-</span></span></div>
         <div class="stat" id="stat-b-hr-row" style="display:none"><span class="stat-label">Avg / Max HR</span><span class="stat-value"><span id="stat-b-hr">-</span><span id="stat-b-hr-diff" class="stat-diff"></span></span></div>
         <div class="stat" id="stat-b-cad-row" style="display:none"><span class="stat-label">Avg cadence</span><span class="stat-value"><span id="stat-b-cad">-</span><span id="stat-b-cad-diff" class="stat-diff"></span></span></div>
+        <div class="stat" id="stat-b-pwr-row" style="display:none"><span class="stat-label">Avg power</span><span class="stat-value"><span id="stat-b-pwr">-</span><span id="stat-b-pwr-diff" class="stat-diff"></span></span></div>
       </div>
     </div>
   </div>
@@ -282,7 +389,7 @@ var dataBaseDir = 'processed/';
 
 var DEFAULT_SPORT_COLORS = {
   Bike: '#1976d2', Run: '#e53935', Walking: '#43a047',
-  Ski: '#8e24aa', Swimming: '#00acc1', Unknown: '#999999'
+  Ski: '#8e24aa', Swimming: '#00acc1', Climbing: '#f57c00', Unknown: '#9e9e9e'
 };
 
 function _hexRgb(hex) {
@@ -498,6 +605,7 @@ var lastFoundTrips = [];
 
 map.on('click', function (e) {
   if (mapDragSelecting) return;
+  if (segPickMode) { handleSegPickClick(e.latlng); return; }
   var radiusM = getClickRadiusM();
   showClickCircle(e.latlng, radiusM);
   var found = findTripsNearPoint(e.latlng, radiusM);
@@ -648,6 +756,7 @@ function highlightTrip(idx) {
     if (!detail) { showDashboardMessage('No detail data. Rerun combine_trips.py to generate trip_details/.'); return; }
     currentDetail = detail;
     renderDashboard();
+    if (_pendingSegSel) { setSelection(_pendingSegSel.start, _pendingSegSel.end); _pendingSegSel = null; }
   });
 }
 
@@ -655,6 +764,9 @@ function highlightTrip(idx) {
 var compareTripIdx = null;
 var compareDetail  = null;
 var compareXs      = null;  // x-array for compare trip (aligned with compareDetail)
+var _pendingSegSel  = null; // {start, end} ptIdx applied after highlightTrip loads detail
+var segSelB         = null; // {start, end} ptIdx for trip B's segment slice (overrides X-mapping)
+var segCompareMode  = false; // true while leaderboard is in "pick effort to compare" state
 var COMPARE_COLOR  = '#e65100';  // default; overridden per-pair by compareColorFor()
 var activeCompareColor = COMPARE_COLOR;
 
@@ -731,6 +843,7 @@ function loadComparison(idx) {
 
 function clearComparison() {
   compareTripIdx = null; compareDetail = null; compareXs = null;
+  segSelB = null; segCompareMode = false;
   if (compareTripHighlight) { map.removeLayer(compareTripHighlight); compareTripHighlight = null; }
   if (compareCursorMarker)  { map.removeLayer(compareCursorMarker);  compareCursorMarker = null; }
   document.getElementById('stats-area').classList.remove('comparing');
@@ -756,8 +869,8 @@ function updateCompareBar() {
   var si = selStartIdx != null ? selStartIdx : 0;
   var ei = selEndIdx   != null ? selEndIdx   : currentDetail.d.length - 1;
   var sa = computeSelectionStats(currentDetail, si, ei);
-  var bsi = indexForX(compareXs, currentXs[si]);
-  var bei = indexForX(compareXs, currentXs[ei]);
+  var bsi = segSelB ? segSelB.start : indexForX(compareXs, currentXs[si]);
+  var bei = segSelB ? segSelB.end   : indexForX(compareXs, currentXs[ei]);
   var sb = computeSelectionStats(compareDetail, bsi, bei);
 
   function fmt(st) {
@@ -826,10 +939,13 @@ function updateCompareBar() {
     (sb.minEle != null && sb.maxEle != null) ? Math.round(sb.minEle) + ' / ' + Math.round(sb.maxEle) + ' m' : '-';
   document.getElementById('stat-b-hr-row').style.display  = (sb.avgHr  != null || sa.avgHr  != null) ? '' : 'none';
   document.getElementById('stat-b-cad-row').style.display = (sb.avgCad != null || sa.avgCad != null) ? '' : 'none';
+  document.getElementById('stat-b-pwr-row').style.display = (sb.avgPwr != null || sa.avgPwr != null) ? '' : 'none';
   setB('stat-b-hr',  sb.avgHr  != null ? sb.avgHr  + ' / ' + sb.maxHr  + ' bpm' : '-',
        sb.avgHr != null && sa.avgHr != null ? signedNum(sb.avgHr, sa.avgHr, 0, 'bpm') : '');
   setB('stat-b-cad', sb.avgCad != null ? sb.avgCad + ' rpm' : '-',
        sb.avgCad != null && sa.avgCad != null ? signedNum(sb.avgCad, sa.avgCad, 0, 'rpm') : '');
+  setB('stat-b-pwr', sb.avgPwr != null ? sb.avgPwr + ' W' : '-',
+       sb.avgPwr != null && sa.avgPwr != null ? signedNum(sb.avgPwr, sa.avgPwr, 0, 'W') : '');
 }
 
 function destroyAllCharts() {
@@ -854,17 +970,17 @@ var cursorMarker = null, compareCursorMarker = null;
 
 // ── flexible chart layout ─────────────────────────────────────────────────────
 // slotAssignment: series key → slot index (0-based), or -1 = hidden
-var slotAssignment = { elev: 0, spd: 0, hr: 1, cad: 2 };
+var slotAssignment = { elev: 0, spd: 0, hr: 1, cad: 2, pwr: -1 };
 var numSlots = 3;
 var MAX_SLOTS = 4;
-var chartColorMode = { elev: 'fill', spd: 'line', hr: 'line', cad: 'line' };
-var COLOR_MODES    = { elev: ['line','fill'], spd: ['line','fill','value'], hr: ['line','fill'], cad: ['line','fill'] };
-var SERIES_KEYS    = ['spd','elev','hr','cad'];
+var chartColorMode = { elev: 'fill', spd: 'line', hr: 'line', cad: 'line', pwr: 'line' };
+var COLOR_MODES    = { elev: ['line','fill'], spd: ['line','fill','value'], hr: ['line','fill'], cad: ['line','fill'], pwr: ['line','fill'] };
+var SERIES_KEYS    = ['spd','elev','hr','cad','pwr'];
 // Per-series colors for single-trip mode. null = use sport color.
-var SERIES_COLOR   = { elev: '#43a047', spd: null, hr: '#e53935', cad: '#ff9800' };
-var SERIES_LABEL   = { elev:'Elevation', spd:'Speed', hr:'Heart Rate', cad:'Cadence' };
-var SERIES_DATA_KEY= { elev:'e', spd:'s', hr:'hr', cad:'cad' };
-var SERIES_Y_LABEL = { elev:'Elevation (m)', spd:'Speed (km/h)', hr:'HR (bpm)', cad:'Cadence (rpm)' };
+var SERIES_COLOR   = { elev: '#43a047', spd: null, hr: '#e53935', cad: '#ff9800', pwr: '#8e24aa' };
+var SERIES_LABEL   = { elev:'Elevation', spd:'Speed', hr:'Heart Rate', cad:'Cadence', pwr:'Power' };
+var SERIES_DATA_KEY= { elev:'e', spd:'s', hr:'hr', cad:'cad', pwr:'pwr' };
+var SERIES_Y_LABEL = { elev:'Elevation (m)', spd:'Speed (km/h)', hr:'HR (bpm)', cad:'Cadence (rpm)', pwr:'Power (W)' };
 // per slot: array of Chart instances, and series counts (for cursor)
 var chartSlots = [];       // Chart per slot index
 var chartSlotMeta = [];    // {seriesCount: N} per slot
@@ -884,7 +1000,8 @@ function renderLayoutPanel() {
   var available = {
     elev: true, spd: true,
     hr:  !!(currentDetail && currentDetail.hr  || compareDetail && compareDetail && compareDetail.hr),
-    cad: !!(currentDetail && currentDetail.cad || compareDetail && compareDetail && compareDetail.cad)
+    cad: !!(currentDetail && currentDetail.cad || compareDetail && compareDetail && compareDetail.cad),
+    pwr: !!(currentDetail && currentDetail.pwr || compareDetail && compareDetail && compareDetail.pwr)
   };
 
   var html = '<table><thead><tr><th></th>';
@@ -1123,13 +1240,14 @@ function computeSelectionStats(detail, startIdx, endIdx) {
     if (minEle == null || el < minEle) minEle = el;
     if (maxEle == null || el > maxEle) maxEle = el;
   }
-  var hrSum = 0, hrCount = 0, hrMax = 0, cadSum = 0, cadCount = 0;
+  var hrSum = 0, hrCount = 0, hrMax = 0, cadSum = 0, cadCount = 0, pwrSum = 0, pwrCount = 0;
   for (var i = startIdx; i <= endIdx; i++) {
     if (detail.hr && detail.hr[i] != null) {
       hrSum += detail.hr[i]; hrCount++;
       if (detail.hr[i] > hrMax) hrMax = detail.hr[i];
     }
     if (detail.cad && detail.cad[i] != null) { cadSum += detail.cad[i]; cadCount++; }
+    if (detail.pwr && detail.pwr[i] != null) { pwrSum += detail.pwr[i]; pwrCount++; }
   }
   return {
     totalDistKm: totalDistKm, totalDurS: totalDurS, maxSpd: maxSpd,
@@ -1139,6 +1257,7 @@ function computeSelectionStats(detail, startIdx, endIdx) {
     avgHr:  hrCount  > 0 ? Math.round(hrSum  / hrCount)  : null,
     maxHr:  hrMax    > 0 ? hrMax : null,
     avgCad: cadCount > 0 ? Math.round(cadSum / cadCount) : null,
+    avgPwr: pwrCount > 0 ? Math.round(pwrSum / pwrCount) : null,
   };
 }
 
@@ -1166,8 +1285,10 @@ function updateDashboardStats() {
     (st.minEle != null && st.maxEle != null) ? Math.round(st.minEle) + ' / ' + Math.round(st.maxEle) + ' m' : '-';
   document.getElementById('stat-hr-row').style.display  = st.avgHr  != null ? '' : 'none';
   document.getElementById('stat-cad-row').style.display = st.avgCad != null ? '' : 'none';
+  document.getElementById('stat-pwr-row').style.display = st.avgPwr != null ? '' : 'none';
   if (st.avgHr  != null) document.getElementById('stat-hr').textContent  = st.avgHr + ' / ' + st.maxHr + ' bpm';
   if (st.avgCad != null) document.getElementById('stat-cad').textContent = st.avgCad + ' rpm';
+  if (st.avgPwr != null) document.getElementById('stat-pwr').textContent = st.avgPwr + ' W';
 }
 
 function setSelection(startIdx, endIdx) {
@@ -1295,7 +1416,8 @@ function renderDashboard() {
   var available = {
     elev: true, spd: true,
     hr:  !!currentDetail.hr,
-    cad: !!currentDetail.cad
+    cad: !!currentDetail.cad,
+    pwr: !!currentDetail.pwr
   };
 
   // Build slot → [keys] mapping (sorted by slot index)
@@ -1519,9 +1641,16 @@ document.getElementById('dashboard-xtoggle').addEventListener('click', function 
 document.getElementById('dashboard-compare').addEventListener('click', function () {
   if (comparePickMode) {
     exitComparePickMode();
+  } else if (segCompareMode) {
+    segCompareMode = false;
+    this.textContent = 'Compare';
+    renderSegmentsPanel();
   } else if (compareTripIdx != null) {
     clearComparison();
     renderDashboard();
+    renderSegmentsPanel();
+  } else if (activeSegId && lbState && !lbState.loading && lbState.results.length > 1) {
+    enterSegCompareMode();
   } else {
     enterComparePickMode('b');
   }
@@ -1603,6 +1732,7 @@ function initApp(data) {
       tracksLayer = new TracksCanvasLayer(); tracksLayer.addTo(map); raiseHighlightLayers();
       if (bounds.isValid()) map.fitBounds(bounds);
       updateClickRadiusLabel();
+      loadSegments(); renderSegMarkers();
       hideLoading();
     }, 0);
   }, 0);
@@ -1679,6 +1809,378 @@ document.getElementById('folder-picker').addEventListener('change', function (e)
       'Loaded from: ' + folderName + '/ (' + detailFiles.length + ' trip detail file(s))';
   });
 });
+
+// ── Segments ──────────────────────────────────────────────────────────────────
+var SEG_STORAGE_KEY = 'heatmap_segments';
+var segments = [];
+var activeSegId = null;
+var segPickMode = false;
+var segPickStep = 0;        // 0 = waiting for start, 1 = waiting for end
+var segDraft = null;
+var segMapMarkers = [];     // all permanent segment markers/lines on map
+var segDraftMarkers = [];   // temporary markers during creation
+var segDraftLine = null;
+var lbState = null;         // current leaderboard state
+
+function loadSegments() {
+  try { segments = JSON.parse(localStorage.getItem(SEG_STORAGE_KEY) || '[]'); }
+  catch (e) { segments = []; }
+}
+function saveSegments() {
+  localStorage.setItem(SEG_STORAGE_KEY, JSON.stringify(segments));
+}
+
+// ── creation flow ─────────────────────────────────────────────────────────────
+function enterSegPickMode() {
+  segPickMode = true; segPickStep = 0;
+  segDraft = { start: null, end: null };
+  clearSegDraftMarkers();
+  map.getContainer().classList.add('seg-pick-mode');
+  renderSegmentsPanel();
+}
+function exitSegPickMode() {
+  segPickMode = false; segPickStep = 0; segDraft = null;
+  clearSegDraftMarkers();
+  map.getContainer().classList.remove('seg-pick-mode');
+  renderSegmentsPanel();
+}
+function clearSegDraftMarkers() {
+  segDraftMarkers.forEach(function (m) { map.removeLayer(m); });
+  segDraftMarkers = [];
+  if (segDraftLine) { map.removeLayer(segDraftLine); segDraftLine = null; }
+}
+
+function handleSegPickClick(latlng) {
+  if (segPickStep === 0) {
+    segDraft.start = { lat: latlng.lat, lon: latlng.lng };
+    var m = L.circleMarker(latlng, { radius: 8, color: '#4CAF50', weight: 3, fillColor: '#4CAF50', fillOpacity: 1 })
+      .bindTooltip('Start', { permanent: true, direction: 'right', offset: [10, 0] }).addTo(map);
+    segDraftMarkers.push(m);
+    segPickStep = 1;
+    renderSegmentsPanel();
+  } else {
+    segDraft.end = { lat: latlng.lat, lon: latlng.lng };
+    var m2 = L.circleMarker(latlng, { radius: 8, color: '#FC4C02', weight: 3, fillColor: '#FC4C02', fillOpacity: 1 })
+      .bindTooltip('End', { permanent: true, direction: 'right', offset: [10, 0] }).addTo(map);
+    segDraftMarkers.push(m2);
+    segDraftLine = L.polyline(
+      [[segDraft.start.lat, segDraft.start.lon], [latlng.lat, latlng.lng]],
+      { color: '#FC4C02', dashArray: '7 5', weight: 2.5, opacity: 0.8 }
+    ).addTo(map);
+    var name = prompt('Name this segment:', 'My Segment');
+    if (name === null) { exitSegPickMode(); return; }
+    name = name.trim() || 'Untitled';
+    var seg = {
+      id: 'seg_' + Date.now(),
+      name: name,
+      start: segDraft.start,
+      end: segDraft.end,
+      created: new Date().toISOString().slice(0, 10)
+    };
+    segments.push(seg);
+    saveSegments();
+    exitSegPickMode();
+    renderSegMarkers();
+    setActiveSegment(seg.id);
+  }
+}
+
+// ── map markers ───────────────────────────────────────────────────────────────
+function clearSegMarkers() {
+  segMapMarkers.forEach(function (m) { map.removeLayer(m); });
+  segMapMarkers = [];
+}
+function renderSegMarkers() {
+  clearSegMarkers();
+  segments.forEach(function (seg) {
+    var active = seg.id === activeSegId;
+    var lineCol = active ? '#FC4C02' : '#bbb';
+    var sm = L.circleMarker([seg.start.lat, seg.start.lon], {
+      radius: active ? 7 : 5, color: '#4CAF50', weight: 2.5,
+      fillColor: '#4CAF50', fillOpacity: active ? 1 : 0.5
+    }).addTo(map);
+    var em = L.circleMarker([seg.end.lat, seg.end.lon], {
+      radius: active ? 7 : 5, color: lineCol, weight: 2.5,
+      fillColor: lineCol, fillOpacity: active ? 1 : 0.5
+    }).addTo(map);
+    var line = L.polyline(
+      [[seg.start.lat, seg.start.lon], [seg.end.lat, seg.end.lon]],
+      { color: lineCol, dashArray: active ? '8 5' : '4 4', weight: active ? 2.5 : 1.5, opacity: active ? 0.85 : 0.4 }
+    ).addTo(map);
+    segMapMarkers.push(sm, em, line);
+  });
+}
+
+// ── leaderboard ───────────────────────────────────────────────────────────────
+var SEG_MATCH_RADIUS_M = 80;
+
+function setActiveSegment(id) {
+  activeSegId = id;
+  lbState = null;
+  renderSegMarkers();
+  if (id && rawAll) {
+    lbState = { segId: id, matches: [], results: [], loading: true };
+    renderSegmentsPanel();        // show spinner immediately
+    setTimeout(function () {      // yield so panel paints first
+      var seg = segments.find(function (s) { return s.id === id; });
+      if (!seg) return;
+      var matches = findSegmentMatches(seg);
+      lbState.matches = matches;
+      if (matches.length === 0) { lbState.loading = false; renderSegmentsPanel(); return; }
+      var remaining = matches.length;
+      matches.forEach(function (match) {
+        loadTripDetail(match.tripIdx, function (detail) {
+          if (detail && detail.t) {
+            var ts = detail.t[match.startPtIdx], te = detail.t[match.endPtIdx];
+            var ds = detail.d[match.startPtIdx], de = detail.d[match.endPtIdx];
+            if (te != null && ts != null && te > ts) {
+              var timeS = te - ts, distM = de - ds;
+              lbState.results.push({
+                tripIdx:    match.tripIdx,
+                startPtIdx: match.startPtIdx,
+                endPtIdx:   match.endPtIdx,
+                timeS:      timeS,
+                distM:      distM,
+                speedKmh:   distM / timeS * 3.6,
+                date:       (tripMeta[match.tripIdx] || {}).date || '?',
+                sport:      tripSport(match.tripIdx)
+              });
+            }
+          }
+          if (--remaining === 0) {
+            lbState.loading = false;
+            lbState.results.sort(function (a, b) { return a.timeS - b.timeS; });
+            lbState.results.forEach(function (r, i) { r.rank = i + 1; });
+            renderSegmentsPanel();
+          }
+        });
+      });
+    }, 0);
+  } else {
+    renderSegmentsPanel();
+  }
+}
+
+function findSegmentMatches(seg) {
+  var R = SEG_MATCH_RADIUS_M;
+  var cosS = Math.cos(seg.start.lat * Math.PI / 180);
+  var cosE = Math.cos(seg.end.lat   * Math.PI / 180);
+  var matches = [];
+  for (var i = 0; i < rawAll.length; i++) {
+    var pts = rawAll[i];
+    // find closest point to start
+    var si = -1, sd = R;
+    for (var p = 0; p < pts.length; p++) {
+      var dl = (pts[p][0] - seg.start.lat) * 111320;
+      var dm = (pts[p][1] - seg.start.lon) * 111320 * cosS;
+      var d  = Math.sqrt(dl*dl + dm*dm);
+      if (d < sd) { sd = d; si = p; }
+    }
+    if (si === -1) continue;
+    // find closest point to end, strictly after si
+    var ei = -1, ed = R;
+    for (var p2 = si + 1; p2 < pts.length; p2++) {
+      var dl2 = (pts[p2][0] - seg.end.lat) * 111320;
+      var dm2 = (pts[p2][1] - seg.end.lon) * 111320 * cosE;
+      var d2  = Math.sqrt(dl2*dl2 + dm2*dm2);
+      if (d2 < ed) { ed = d2; ei = p2; }
+    }
+    if (ei === -1) continue;
+    matches.push({ tripIdx: i, startPtIdx: si, endPtIdx: ei });
+  }
+  return matches;
+}
+
+// ── rendering ─────────────────────────────────────────────────────────────────
+function _esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function _segFmtTime(s) {
+  s = Math.round(s);
+  var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sc = s % 60;
+  if (h > 0) return h + 'h' + (m < 10 ? '0' : '') + m + 'm' + (sc < 10 ? '0' : '') + sc + 's';
+  if (m > 0) return m + 'm' + (sc < 10 ? '0' : '') + sc + 's';
+  return sc + 's';
+}
+function _rankIcon(rank) {
+  if (rank === 1) return '<span class="lb-medal-1">🥇</span>';
+  if (rank === 2) return '<span class="lb-medal-2">🥈</span>';
+  if (rank === 3) return '<span class="lb-medal-3">🥉</span>';
+  return '<span class="lb-num">' + rank + '</span>';
+}
+
+function openSegPanel() {
+  loadSegments();
+  renderSegmentsPanel();
+  document.getElementById('segments-panel').classList.add('visible');
+}
+function closeSegPanel() {
+  document.getElementById('segments-panel').classList.remove('visible');
+  exitSegPickMode();
+  activeSegId = null; lbState = null;
+  renderSegMarkers();
+}
+
+function renderSegmentsPanel() {
+  var panel = document.getElementById('segments-panel');
+  if (!panel.classList.contains('visible')) return;
+
+  // show leaderboard view when a segment is active
+  if (activeSegId && lbState) {
+    _renderLeaderboard(panel); return;
+  }
+
+  var html = '<div class="seg-header"><strong>◆ Segments</strong>'
+           + '<button onclick="closeSegPanel()">&times;</button></div>';
+
+  if (segPickMode) {
+    html += '<div class="seg-create-bar">';
+    if (segPickStep === 0) {
+      html += '<span class="seg-create-hint"><span class="seg-step-dot start"></span>Click the map to place the <strong>start</strong> point</span>';
+    } else {
+      html += '<span class="seg-create-hint"><span class="seg-step-dot end"></span>Click the map to place the <strong>end</strong> point</span>';
+    }
+    html += '<button class="seg-cancel" onclick="exitSegPickMode()">Cancel</button></div>';
+  } else {
+    html += '<div class="seg-create-bar"><button onclick="enterSegPickMode()">+ Create segment</button></div>';
+  }
+
+  html += '<div class="seg-body">';
+  if (segments.length === 0) {
+    html += '<div class="seg-empty">No segments yet.<br>Create one to start timing your efforts on any section of your rides, runs or hikes.</div>';
+  } else {
+    segments.forEach(function (seg) {
+      var active = seg.id === activeSegId;
+      html += '<div class="seg-card' + (active ? ' active' : '') + '" onclick="setActiveSegment(\'' + seg.id + '\')">';
+      html += '<div class="seg-card-name">◆ ' + _esc(seg.name) + '</div>';
+      html += '<div class="seg-card-meta">' + seg.created + '</div>';
+      html += '<div class="seg-card-actions" onclick="event.stopPropagation()">';
+      html += '<button onclick="segRename(\'' + seg.id + '\')">Rename</button>';
+      html += '<button onclick="segReverse(\'' + seg.id + '\')">Reverse</button>';
+      html += '<button onclick="segCopy(\'' + seg.id + '\')">Copy</button>';
+      html += '<button class="seg-del" onclick="segDelete(\'' + seg.id + '\')">Delete</button>';
+      html += '</div></div>';
+    });
+  }
+  html += '</div>';
+  panel.innerHTML = html;
+}
+
+function _renderLeaderboard(panel) {
+  var seg = segments.find(function (s) { return s.id === activeSegId; });
+  var segName = seg ? seg.name : 'Segment';
+
+  var html = '<div class="seg-header"><strong>◆ Segments</strong>'
+           + '<button onclick="closeSegPanel()">&times;</button></div>';
+  html += '<div class="seg-lb-header">';
+  html += '<button class="seg-lb-back" onclick="activeSegId=null;lbState=null;segCompareMode=false;document.getElementById(\'dashboard-compare\').textContent=\'Compare\';renderSegMarkers();renderSegmentsPanel();">←</button>';
+  html += '<span class="seg-lb-title">' + _esc(segName) + '</span>';
+  html += '<div class="seg-card-actions" onclick="event.stopPropagation()" style="flex-shrink:0">';
+  html += '<button onclick="segReverse(\'' + activeSegId + '\')">⇄</button>';
+  html += '<button class="seg-del" onclick="segDelete(\'' + activeSegId + '\')">✕</button>';
+  html += '</div></div>';
+
+  if (lbState.loading) {
+    html += '<div class="seg-empty">Searching ' + (rawAll ? rawAll.length : '…') + ' trips…<br><small>Loading times</small></div>';
+  } else if (lbState.results.length === 0) {
+    html += '<div class="seg-empty">No trips found passing through this segment.<br><small>Try placing start/end points closer to your tracks, or increase the match radius.</small></div>';
+    html += '<div style="padding:0 10px 10px"><button onclick="segReverse(\'' + activeSegId + '\')" style="font-size:12px;padding:4px 10px;background:#FC4C02;color:white;border:none;border-radius:4px;cursor:pointer;">Try reversed direction</button></div>';
+  } else {
+    if (segCompareMode) {
+      html += '<div class="seg-lb-sub" style="color:#FC4C02;font-weight:600;">Pick an effort to compare ↓</div>';
+    } else {
+      html += '<div class="seg-lb-sub">' + lbState.results.length + ' effort' + (lbState.results.length !== 1 ? 's' : '') + ' · fastest to slowest · click to open</div>';
+    }
+    html += '<div class="seg-body" style="padding:0">';
+    html += '<table class="seg-lb-table"><thead><tr>';
+    html += '<th class="lb-rank">#</th><th>Date</th><th>Time</th><th>Avg</th>';
+    if (segCompareMode) html += '<th></th>';
+    html += '</tr></thead><tbody>';
+    lbState.results.forEach(function (r) {
+      var isCurrent = (r.tripIdx === currentTripIdx);
+      var rowStyle = isCurrent ? ' style="background:#f0f7ff;"' : '';
+      if (segCompareMode) {
+        html += '<tr' + rowStyle + '>';
+        html += '<td class="lb-rank">' + _rankIcon(r.rank) + '</td>';
+        html += '<td class="lb-date">' + r.date + (isCurrent ? ' <span style="color:#1976d2;font-size:10px">(A)</span>' : '') + '</td>';
+        html += '<td class="lb-time">' + _segFmtTime(r.timeS) + '</td>';
+        html += '<td class="lb-speed">' + r.speedKmh.toFixed(1) + ' km/h</td>';
+        if (isCurrent) {
+          html += '<td></td>';
+        } else {
+          html += '<td><button onclick="segPickCompare(' + r.tripIdx + ',' + r.startPtIdx + ',' + r.endPtIdx + ')" '
+               + 'style="font-size:10px;padding:2px 7px;background:#FC4C02;color:white;border:none;border-radius:3px;cursor:pointer;">B</button></td>';
+        }
+        html += '</tr>';
+      } else {
+        html += '<tr onclick="openFromLeaderboard(' + r.tripIdx + ',' + r.startPtIdx + ',' + r.endPtIdx + ')"' + rowStyle + '>';
+        html += '<td class="lb-rank">' + _rankIcon(r.rank) + '</td>';
+        html += '<td class="lb-date">' + r.date + (isCurrent ? ' <span style="color:#1976d2;font-size:10px">▶</span>' : '') + '</td>';
+        html += '<td class="lb-time">' + _segFmtTime(r.timeS) + '</td>';
+        html += '<td class="lb-speed">' + r.speedKmh.toFixed(1) + ' km/h</td>';
+        html += '</tr>';
+      }
+    });
+    html += '</tbody></table></div>';
+  }
+  panel.innerHTML = html;
+}
+
+// ── segment compare helpers ───────────────────────────────────────────────────
+function openFromLeaderboard(tripIdx, startPtIdx, endPtIdx) {
+  _pendingSegSel = { start: startPtIdx, end: endPtIdx };
+  highlightTrip(tripIdx);
+}
+
+function enterSegCompareMode() {
+  segCompareMode = true;
+  document.getElementById('dashboard-compare').textContent = 'Cancel';
+  if (!document.getElementById('segments-panel').classList.contains('visible')) openSegPanel();
+  renderSegmentsPanel();
+}
+
+function segPickCompare(tripIdx, startPtIdx, endPtIdx) {
+  segCompareMode = false;
+  document.getElementById('dashboard-compare').textContent = 'Compare';
+  segSelB = { start: startPtIdx, end: endPtIdx };
+  loadComparison(tripIdx);
+  renderSegmentsPanel();
+}
+
+// ── segment operations ────────────────────────────────────────────────────────
+function segRename(id) {
+  var seg = segments.find(function (s) { return s.id === id; });
+  if (!seg) return;
+  var name = prompt('Rename segment:', seg.name);
+  if (name === null) return;
+  seg.name = name.trim() || seg.name;
+  saveSegments(); renderSegmentsPanel();
+}
+function segReverse(id) {
+  var seg = segments.find(function (s) { return s.id === id; });
+  if (!seg) return;
+  var tmp = seg.start; seg.start = seg.end; seg.end = tmp;
+  saveSegments(); renderSegMarkers();
+  if (activeSegId === id) setActiveSegment(id); else renderSegmentsPanel();
+}
+function segCopy(id) {
+  var seg = segments.find(function (s) { return s.id === id; });
+  if (!seg) return;
+  var name = prompt('Name for copy:', seg.name + ' (copy)');
+  if (name === null) return;
+  var copy = JSON.parse(JSON.stringify(seg));
+  copy.id = 'seg_' + Date.now();
+  copy.name = name.trim() || copy.name;
+  copy.created = new Date().toISOString().slice(0, 10);
+  segments.push(copy); saveSegments(); renderSegmentsPanel(); renderSegMarkers();
+}
+function segDelete(id) {
+  if (!confirm('Delete this segment?')) return;
+  segments = segments.filter(function (s) { return s.id !== id; });
+  saveSegments();
+  if (activeSegId === id) { activeSegId = null; lbState = null; }
+  renderSegMarkers(); renderSegmentsPanel();
+}
 
 loadDefaultData();
 </script>

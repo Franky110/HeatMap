@@ -35,6 +35,48 @@ from trip_manager import list_trips, trip_id, SOURCE_DIR, load_config, save_conf
 
 
 # ---------------------------------------------------------------------------
+# Sport type normalisation: map raw provider type strings → canonical category
+# ---------------------------------------------------------------------------
+SPORT_TYPE_MAP = {
+    # Garmin typeKey values
+    'running': 'Run', 'trail_running': 'Run', 'treadmill_running': 'Run',
+    'virtual_running': 'Run', 'track_running': 'Run',
+    'cycling': 'Bike', 'mountain_biking': 'Bike', 'indoor_cycling': 'Bike',
+    'virtual_ride': 'Bike', 'gravel_cycling': 'Bike', 'road_cycling': 'Bike',
+    'bmx': 'Bike', 'cyclocross': 'Bike', 'e_bike_fitness': 'Bike',
+    'swimming': 'Swimming', 'open_water_swimming': 'Swimming', 'lap_swimming': 'Swimming',
+    'hiking': 'Walking', 'walking': 'Walking', 'casual_walking': 'Walking',
+    'speed_walking': 'Walking', 'indoor_walking': 'Walking',
+    'skiing': 'Ski', 'resort_skiing_snowboarding': 'Ski', 'backcountry_skiing': 'Ski',
+    'snowboarding': 'Ski', 'cross_country_skiing': 'Ski', 'skate_skiing': 'Ski',
+    'rock_climbing': 'Climbing', 'bouldering': 'Climbing', 'indoor_climbing': 'Climbing',
+    # Strava sport_type values
+    'Run': 'Run', 'TrailRun': 'Run', 'VirtualRun': 'Run', 'Treadmill': 'Run',
+    'Ride': 'Bike', 'VirtualRide': 'Bike', 'MountainBikeRide': 'Bike',
+    'GravelRide': 'Bike', 'EBikeRide': 'Bike', 'EMountainBikeRide': 'Bike',
+    'Velomobile': 'Bike', 'Handcycle': 'Bike',
+    'Swim': 'Swimming',
+    'Hike': 'Walking', 'Walk': 'Walking',
+    'AlpineSki': 'Ski', 'BackcountrySki': 'Ski', 'NordicSki': 'Ski', 'Snowboard': 'Ski',
+    'RockClimbing': 'Climbing',
+}
+
+
+def normalize_sport(activity_type):
+    """Return a canonical sport category from a raw provider type string, or ''."""
+    return SPORT_TYPE_MAP.get(activity_type, '')
+
+
+def inject_gpx_metadata(gpx_content, provider_key, activity_type=''):
+    """Prepend heatmap-source / heatmap-sport comments to a GPX string."""
+    lines = [f'<!-- heatmap-source: {provider_key} -->']
+    sport = normalize_sport(activity_type)
+    if sport:
+        lines.append(f'<!-- heatmap-sport: {sport} -->')
+    return '\n'.join(lines) + '\n' + gpx_content
+
+
+# ---------------------------------------------------------------------------
 # Headless / auto-check helpers
 # ---------------------------------------------------------------------------
 
@@ -48,9 +90,10 @@ class _FakeVar:
 
 def _apply_headless_filters(tours, defaults, type_choices):
     """Filter a {id: meta} dict using a saved-defaults dict."""
-    type_choice = type_choices.get(defaults.get('type', 'All'), 'all')
-    start_date  = defaults.get('start_date', '')
-    end_date    = defaults.get('end_date', '')
+    type_choice    = type_choices.get(defaults.get('type', 'All'), 'all')
+    start_date     = defaults.get('start_date', '')
+    end_date       = defaults.get('end_date', '')
+    excluded_sports = set(defaults.get('excluded_sports', []))
     try:
         min_dist = float(defaults.get('min_dist', 0))
     except (TypeError, ValueError):
@@ -59,6 +102,8 @@ def _apply_headless_filters(tours, defaults, type_choices):
     result = {}
     for tid, t in tours.items():
         if type_choice != 'all' and t.get('type') != type_choice:
+            continue
+        if excluded_sports and t.get('sport') in excluded_sports:
             continue
         date = (t.get('date') or '')[:10]
         if start_date and date < start_date:
@@ -241,18 +286,22 @@ class ImportWindowBase(tk.Toplevel):
         for key, var in _str.items():
             if d.get(key) is not None:
                 var.set(d[key])
+        # Sport exclusions are applied later in _set_sports (sports aren't known yet)
+        self._pending_excluded_sports = set(d.get('excluded_sports', []))
 
     def _collect_defaults(self):
+        excluded = [s for s, v in self._sport_vars.items() if not v.get()]
         return {
-            'hr':           self.import_hr_var.get(),
-            'cad':          self.import_cad_var.get(),
-            'pwr':          self.import_pwr_var.get(),
-            'tmp':          self.import_tmp_var.get(),
-            'tours_filter': self.tours_filter_var.get(),
-            'type':         self.type_var.get(),
-            'start_date':   self.start_date_var.get(),
-            'end_date':     self.end_date_var.get(),
-            'min_dist':     self.min_dist_var.get(),
+            'hr':               self.import_hr_var.get(),
+            'cad':              self.import_cad_var.get(),
+            'pwr':              self.import_pwr_var.get(),
+            'tmp':              self.import_tmp_var.get(),
+            'tours_filter':     self.tours_filter_var.get(),
+            'type':             self.type_var.get(),
+            'start_date':       self.start_date_var.get(),
+            'end_date':         self.end_date_var.get(),
+            'min_dist':         self.min_dist_var.get(),
+            'excluded_sports':  excluded,
         }
 
     def _save_defaults(self):
@@ -269,18 +318,18 @@ class ImportWindowBase(tk.Toplevel):
 
     # ------------------------------------------------- headless / auto-check
     @classmethod
-    def _run_headless(cls, log_fn, on_done):
-        """Non-interactive auto-check: load saved credentials, fetch new
-        activities matching saved defaults, and download them."""
+    def _run_headless(cls, log_fn, on_done, show_confirm=None):
+        """Non-interactive auto-check: fetch new activities matching saved defaults.
+        If show_confirm is provided, it is called with (provider_name, [(tid, meta), ...])
+        and must return the subset the user approved; download is skipped if None."""
         try:
             defaults = load_config().get("import_defaults", {}).get(cls.PROVIDER_KEY, {})
             inst = object.__new__(cls)
-            # Set the vars that authenticate() / download_activity() read.
             inst.import_hr_var  = _FakeVar(defaults.get('hr',  True))
             inst.import_cad_var = _FakeVar(defaults.get('cad', True))
             inst.import_pwr_var = _FakeVar(defaults.get('pwr', False))
             inst.import_tmp_var = _FakeVar(defaults.get('tmp', False))
-            inst.remember_var   = _FakeVar(True)   # always keep tokens updated
+            inst.remember_var   = _FakeVar(True)
 
             if not inst._headless_init():
                 log_fn(f"{cls.PROVIDER} auto-check: no saved credentials — open the import window to connect.\n")
@@ -301,12 +350,29 @@ class ImportWindowBase(tk.Toplevel):
                 return
 
             filtered = _apply_headless_filters(new_tours, defaults, cls.TYPE_CHOICES)
-            log_fn(f"{cls.PROVIDER}: {len(filtered)} new activity(ies) match filters, downloading…\n")
+            if not filtered:
+                log_fn(f"{cls.PROVIDER}: no new activities match filters.\n")
+                if on_done: on_done(0)
+                return
 
+            log_fn(f"{cls.PROVIDER}: {len(filtered)} new activity(ies) match filters.\n")
+
+            if show_confirm is not None:
+                approved = show_confirm(cls.PROVIDER, list(filtered.items()))
+                if not approved:
+                    log_fn(f"{cls.PROVIDER}: import skipped by user.\n")
+                    if on_done: on_done(0)
+                    return
+                to_download = approved
+            else:
+                to_download = list(filtered.items())
+
+            log_fn(f"{cls.PROVIDER}: downloading {len(to_download)} activity(ies)…\n")
             downloaded = 0
-            for tid, meta in filtered.items():
+            for tid, meta in to_download:
                 try:
                     gpx = inst.download_activity(tid, meta)
+                    gpx = inject_gpx_metadata(gpx, cls.PROVIDER_KEY, meta.get('type', ''))
                     fname = inst.activity_filename(tid, meta)
                     with open(os.path.join(SOURCE_DIR, fname), 'w', encoding='utf-8') as fh:
                         fh.write(gpx)
@@ -375,6 +441,7 @@ class ImportWindowBase(tk.Toplevel):
         self._sport_btn.grid(row=0, column=5, padx=4, pady=4, sticky="w")
         self._sport_vars = {}    # sport name -> tk.BooleanVar
         self._sport_popup = None
+        self._pending_excluded_sports = set()  # populated by _apply_defaults, consumed by _set_sports
 
         ttk.Label(filt, text="Start date (YYYY-MM-DD):").grid(row=1, column=0, padx=4, pady=4, sticky="e")
         self.start_date_var = tk.StringVar()
@@ -398,7 +465,12 @@ class ImportWindowBase(tk.Toplevel):
         """Populate the sport multi-select with the given list, preserving
         any existing selections for sports that are still present."""
         old = {s: v.get() for s, v in self._sport_vars.items()}
-        self._sport_vars = {s: tk.BooleanVar(value=old.get(s, True)) for s in sports}
+        pending = getattr(self, '_pending_excluded_sports', set())
+        self._sport_vars = {
+            s: tk.BooleanVar(value=old.get(s, s not in pending))
+            for s in sports
+        }
+        self._pending_excluded_sports = set()  # consumed
         self._update_sport_btn()
         if self._sport_popup and self._sport_popup.winfo_exists():
             self._close_sport_popup()
@@ -705,6 +777,8 @@ class ImportWindowBase(tk.Toplevel):
 
                 self._log(f"Downloading activity {tid} ({tour_meta.get('name', '')})...")
                 gpx_content = self.download_activity(tid, tour_meta)
+                gpx_content = inject_gpx_metadata(gpx_content, self.PROVIDER_KEY,
+                                                   tour_meta.get('type', ''))
 
                 path = os.path.join(SOURCE_DIR, self.activity_filename(tid, tour_meta))
                 with open(path, "w", encoding="utf-8") as fh:

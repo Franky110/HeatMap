@@ -27,26 +27,8 @@ RAW_POINT_STRIDE = 3
 # track segments (rawAll). Below this the point is skipped as a near-duplicate.
 GPS_MIN_STEP_M = 5.0
 
-NAME_RE = re.compile(r'^(\d{4}-\d{2}-\d{2})_')
-TITLE_RE = re.compile(r'^\d{4}-\d{2}-\d{2}_(.+)-\d+\.gpx$', re.IGNORECASE)
-DATETIME_SUFFIX_RE = re.compile(r'\s+\d{2}\.\d{2}\.\d{4}\s+\d{3,4}$')
-
-SPORT_KEYWORDS = [
-    (re.compile(r'v[ée]lo|vtt|cyclisme|gravel|mtb|giro', re.IGNORECASE), "Bike"),
-    (re.compile(r'ski', re.IGNORECASE), "Ski"),
-    (re.compile(r'natation|nage|swim', re.IGNORECASE), "Swimming"),
-    (re.compile(r'course|running', re.IGNORECASE), "Run"),
-    (re.compile(r'randonn|marche|hiking|walk', re.IGNORECASE), "Walking"),
-]
-
-
-def trip_sport(filename):
-    m = TITLE_RE.match(filename)
-    title = DATETIME_SUFFIX_RE.sub('', m.group(1)).strip() if m else ""
-    for pattern, category in SPORT_KEYWORDS:
-        if pattern.search(title):
-            return category
-    return "Bike"
+import trip_utils
+from trip_utils import NAME_RE, read_gpx_meta, trip_sport
 
 
 def load_js_data(path):
@@ -155,8 +137,9 @@ def decimate_trip(trip):
 
 # Maximum plausible GPS speed (km/h) per sport — spikes above this are clamped.
 SPORT_MAX_SPEED_KMH = {
-    "Bike":     120.0,
-    "Run":       45.0,
+    "Bike":      120.0,
+    "Run":        45.0,
+    "Climbing":   10.0,
     "Walking":   20.0,
     "Ski":      200.0,
     "Swimming":  12.0,
@@ -260,7 +243,7 @@ def main():
                 continue
             if args.end_date and date > args.end_date:
                 continue
-            if args.sport and trip_sport(f) != args.sport:
+            if args.sport and trip_sport(f, os.path.join(SOURCE_DIR, f)) != args.sport:
                 continue
             SAMPLE_FILES.append(f)
         if args.limit > 0:
@@ -295,7 +278,8 @@ def main():
     n_too_short = 0
 
     for f in SAMPLE_FILES:
-        trip = load_trip(os.path.join(SOURCE_DIR, f))
+        fpath = os.path.join(SOURCE_DIR, f)
+        trip = load_trip(fpath)
         if len(trip) < 2:
             continue
         dist_km = round(trip_distance_km(trip), 1)
@@ -304,16 +288,21 @@ def main():
             continue
         m = NAME_RE.match(f)
         trip_idx = trip_idx_offset + len(trips_meta)
-        trips_meta.append({
+        source, _ = read_gpx_meta(fpath)
+        sport = trip_sport(f, fpath)
+        entry = {
             "name": f,
             "date": m.group(1) if m else "",
             "distanceKm": dist_km,
-            "sport": trip_sport(f),
-        })
+            "sport": sport,
+        }
+        if source:
+            entry["source"] = source
+        trips_meta.append(entry)
         raw_trip = decimate_trip(trip)
         raw_all.append([[round(pt[0], 6), round(pt[1], 6)] for pt in raw_trip])
 
-        detail = trip_detail(raw_trip, sport=trip_sport(f))
+        detail = trip_detail(raw_trip, sport=sport)
         with open(os.path.join(TRIP_DETAILS_DIR, f"trip_{trip_idx}.js"), "w", encoding="utf-8") as out:
             out.write(f"var tripDetail_{trip_idx} = ")
             json.dump(detail, out)
