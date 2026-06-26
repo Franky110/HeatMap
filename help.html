@@ -72,7 +72,8 @@
     <li><a href="#dashboard">6. The trip dashboard</a></li>
     <li><a href="#segments">7. Segments</a></li>
     <li><a href="#data-wizard">8. Data Wizard</a></li>
-    <li><a href="#data-folder">9. Where your data is stored</a></li>
+    <li><a href="#android">9. Android companion app</a></li>
+    <li><a href="#data-folder">10. Where your data is stored</a></li>
   </ul>
 </div>
 
@@ -82,6 +83,8 @@
   Trip Manager is a set of files you can copy anywhere on your computer
   (e.g. a folder on your Desktop) — there is no traditional installer.
 </p>
+
+<h3>Windows</h3>
 <ol>
   <li>
     Double-click <strong>setup.bat</strong>. The first time it runs, it will:
@@ -101,9 +104,27 @@
     Desktop for convenience.
   </li>
 </ol>
+
+<h3>macOS / Linux</h3>
+<ol>
+  <li>
+    Make sure Python 3.9+ is installed.
+    On Linux you may also need: <code>sudo apt install python3-tk</code> (Debian/Ubuntu)
+    or the equivalent for your distro.
+  </li>
+  <li>Open a terminal in the Trip Manager folder and run:
+    <pre><code>./setup.sh</code></pre>
+    This creates the <code>env</code> virtual environment and installs the required packages.
+  </li>
+  <li>To launch the app:
+    <pre><code>./trip_manager.sh</code></pre>
+  </li>
+</ol>
+
 <div class="note">
   Setup only needs to be run once (or again after updating Trip Manager to a
-  new version). After that, just use <strong>Trip Manager.bat</strong> to launch it.
+  new version). After that, just use <strong>Trip Manager.bat</strong> (Windows) or
+  <code>./trip_manager.sh</code> (macOS/Linux) to launch it.
 </div>
 
 <h2 id="import">1. Importing data</h2>
@@ -115,6 +136,11 @@
   Use the import buttons in the top-left of the window. The first time you use
   a service you'll be asked for your login credentials. For Komoot these are
   stored encrypted on your computer and won't be asked again on the same PC.
+</p>
+<p>
+  When the download finishes, a dialog asks whether you want to process and
+  visualize the new trips straight away. Only the newly downloaded trips are
+  selected — existing processed data is untouched.
 </p>
 
 <h3>Add files manually</h3>
@@ -429,7 +455,45 @@
   Use <strong>Find duplicates</strong> first to identify which copy to keep before deleting.
 </div>
 
-<h2 id="data-folder">9. Where your data is stored</h2>
+<h2 id="android">9. Android companion app</h2>
+
+<p>
+  The Android app lets you view your heatmap and dashboards on your phone.
+  It serves the same <code>combined.html</code> viewer over a local HTTP server
+  and displays it in an embedded browser — no internet connection required for
+  the map data itself (map tiles still need connectivity).
+</p>
+
+<h3>How it works</h3>
+<ol>
+  <li>Process your trips on the desktop as usual.</li>
+  <li>Transfer the <code>processed/</code> folder to your phone via USB:
+    <pre><code>Android / data / com.tripmanager.app / files / processed /</code></pre>
+    Copy <code>raw_data.js</code> and the <code>trip_details/</code> folder into that location.
+  </li>
+  <li>Open Trip Manager on your phone — it detects the data and shows an <strong>Open Heatmap</strong> button.</li>
+</ol>
+
+<div class="note">
+  On Android 11 and above, the <code>Android/data/</code> folder may be hidden from USB file managers.
+  Use <strong>adb</strong> to copy the files instead:<br>
+  <code>adb push processed/ /sdcard/Android/data/com.tripmanager.app/files/processed/</code>
+</div>
+
+<h3>Building and installing the app</h3>
+<p>
+  See <strong>android_app/README.md</strong> in the project folder for the full
+  build setup (Flutter SDK, Android Studio, emulator or physical device).
+  The short version:
+</p>
+<ol>
+  <li>Install Flutter and Android Studio.</li>
+  <li>Run <code>android_app/scripts/prepare_assets.bat</code> (Windows) or
+      <code>prepare_assets.sh</code> (macOS/Linux) to copy <code>combined.html</code> into the app assets.</li>
+  <li>Run <code>flutter pub get</code> then <code>flutter run</code> inside <code>android_app/</code>.</li>
+</ol>
+
+<h2 id="data-folder">10. Where your data is stored</h2>
 
 <p>
   The first time you run Trip Manager, it asks you to choose or create a
