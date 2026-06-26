@@ -25,7 +25,7 @@ from komootgpx.api import KomootApi
 from komootgpx.gpxcompiler import GpxCompiler
 
 from trip_manager import DATA_DIR
-from dpapi_utils import dpapi_encrypt, dpapi_decrypt
+from dpapi_utils import dpapi_encrypt, dpapi_decrypt, secure_credential_file
 from activity_import_base import ImportWindowBase
 
 CREDENTIALS_PATH = os.path.join(DATA_DIR, "komoot_credentials.json")
@@ -52,6 +52,7 @@ def save_credentials(email, password):
     enc = base64.b64encode(dpapi_encrypt(password.encode("utf-8"))).decode("ascii")
     with open(CREDENTIALS_PATH, "w", encoding="utf-8") as fh:
         json.dump({"email": email, "password_enc": enc}, fh)
+    secure_credential_file(CREDENTIALS_PATH)
 
 
 def clear_credentials():

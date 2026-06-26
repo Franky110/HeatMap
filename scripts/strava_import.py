@@ -19,7 +19,7 @@ from datetime import datetime
 import requests
 
 from trip_manager import DATA_DIR
-from dpapi_utils import dpapi_encrypt, dpapi_decrypt
+from dpapi_utils import dpapi_encrypt, dpapi_decrypt, secure_credential_file
 from activity_import_base import ImportWindowBase, run_oauth_flow, build_gpx
 
 import tkinter as tk
@@ -54,6 +54,7 @@ def save_credentials(client_id, client_secret, refresh_token=""):
     enc = base64.b64encode(dpapi_encrypt(refresh_token.encode("utf-8"))).decode("ascii") if refresh_token else ""
     with open(CREDENTIALS_PATH, "w", encoding="utf-8") as fh:
         json.dump({"client_id": client_id, "client_secret": client_secret, "refresh_token_enc": enc}, fh)
+    secure_credential_file(CREDENTIALS_PATH)
 
 
 def clear_credentials():

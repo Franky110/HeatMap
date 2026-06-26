@@ -23,15 +23,24 @@ each trip's elevation, speed, heart rate, and cadence in an interactive dashboar
 
 ## Requirements
 
-- Windows 10/11
+- Windows 10/11, macOS 12+, or Linux (any modern distro)
 - Python 3.9+ ([python.org](https://www.python.org/downloads/))
+- tkinter (included with the python.org installer; on Linux: `sudo apt install python3-tk`)
 
 ## Getting started
 
+### Windows
 1. Download and unzip the [latest release](../../releases/latest)
 2. **Right-click the zip → Properties → check Unblock → OK** before extracting (avoids Windows security warnings)
 3. Run `setup.bat` once to create the Python environment
 4. Double-click **Trip Manager.bat** to launch
+
+### macOS / Linux
+1. Clone or download and unzip the repository
+2. Run `./setup.sh` once to create the Python environment
+3. Run `./trip_manager.sh` to launch
+
+> **Credential security:** On Windows, saved passwords are encrypted with DPAPI and bound to your user account. On macOS and Linux, they are stored as base64 in the credential file with permissions set to `600` (owner read/write only). Keep your data folder private.
 
 ## Importing trips
 
