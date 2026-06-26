@@ -595,13 +595,38 @@ class TripManager(tk.Tk):
             )
 
     def import_from_komoot(self):
-        self._import_window("komoot_import", "KomootImportWindow", on_downloaded=self.refresh)
+        self._import_window("komoot_import", "KomootImportWindow",
+                            on_downloaded=self._prompt_process_new)
 
     def import_from_strava(self):
-        self._import_window("strava_import", "StravaImportWindow", on_downloaded=self.refresh)
+        self._import_window("strava_import", "StravaImportWindow",
+                            on_downloaded=self._prompt_process_new)
 
     def import_from_garmin(self):
-        self._import_window("garmin_import", "GarminImportWindow", on_downloaded=self.refresh)
+        self._import_window("garmin_import", "GarminImportWindow",
+                            on_downloaded=self._prompt_process_new)
+
+    def _prompt_process_new(self, filenames):
+        """Refresh the trip list then offer to process just the downloaded files."""
+        self.refresh()
+        if not filenames:
+            return
+        n = len(filenames)
+        trip_word = "trip" if n == 1 else "trips"
+        if not messagebox.askyesno(
+            "Process new trips",
+            f"{n} {trip_word} downloaded.\nRun processing now for {'this trip' if n == 1 else 'these trips'}?",
+            parent=self,
+        ):
+            return
+        # Select exactly those rows so run_processing() uses --files <names>
+        fname_set = set(filenames)
+        to_select = [
+            iid for iid in self.tree.get_children("")
+            if self.tree.item(iid, "values")[1] in fname_set
+        ]
+        self.tree.selection_set(to_select)
+        self.run_processing()
 
     def _run_startup_auto_checks(self):
         cfg = load_config()
@@ -617,9 +642,9 @@ class TripManager(tk.Tk):
             try:
                 mod = __import__(module_name)
                 cls = getattr(mod, class_name)
-                def _done(n, k=key):
-                    if n > 0:
-                        self.after(0, self.refresh)
+                def _done(names, k=key):
+                    if names:
+                        self.after(0, self._prompt_process_new, names)
 
                 def _show_confirm(provider_name, trips, _master=self):
                     result = []

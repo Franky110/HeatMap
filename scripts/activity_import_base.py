@@ -368,7 +368,7 @@ class ImportWindowBase(tk.Toplevel):
                 to_download = list(filtered.items())
 
             log_fn(f"{cls.PROVIDER}: downloading {len(to_download)} activity(ies)…\n")
-            downloaded = 0
+            downloaded_names = []
             for tid, meta in to_download:
                 try:
                     gpx = inst.download_activity(tid, meta)
@@ -376,13 +376,13 @@ class ImportWindowBase(tk.Toplevel):
                     fname = inst.activity_filename(tid, meta)
                     with open(os.path.join(SOURCE_DIR, fname), 'w', encoding='utf-8') as fh:
                         fh.write(gpx)
-                    downloaded += 1
+                    downloaded_names.append(fname)
                     log_fn(f"  Downloaded: {fname}\n")
                 except Exception as e:
                     log_fn(f"  Error downloading {tid}: {e}\n")
 
-            log_fn(f"{cls.PROVIDER} auto-check done: {downloaded} activity(ies) downloaded.\n")
-            if on_done: on_done(downloaded)
+            log_fn(f"{cls.PROVIDER} auto-check done: {len(downloaded_names)} activity(ies) downloaded.\n")
+            if on_done: on_done(downloaded_names)
 
         except Exception as e:
             log_fn(f"{cls.PROVIDER} auto-check failed: {e}\n")
@@ -765,7 +765,7 @@ class ImportWindowBase(tk.Toplevel):
         thread.start()
 
     def _download_thread(self, ids):
-        downloaded = 0
+        downloaded_names = []
         existing_by_id = {trip_id(f): f for f in list_trips() if trip_id(f)}
         for tid in ids:
             tour_meta = self.new_tours.get(tid) or self.all_tours.get(tid)
@@ -784,17 +784,17 @@ class ImportWindowBase(tk.Toplevel):
                 with open(path, "w", encoding="utf-8") as fh:
                     fh.write(gpx_content)
 
-                downloaded += 1
+                downloaded_names.append(os.path.basename(path))
                 self._log(f"  -> wrote {os.path.basename(path)}")
             except Exception as e:
                 self._log(f"  Error downloading {tid}: {e}")
             finally:
                 self.after(0, self.progress.step, 1)
 
-        self._log(f"Done: {downloaded}/{len(ids)} activity(ies) downloaded.")
-        self.after(0, self._download_done, ids)
+        self._log(f"Done: {len(downloaded_names)}/{len(ids)} activity(ies) downloaded.")
+        self.after(0, self._download_done, ids, downloaded_names)
 
-    def _download_done(self, ids):
+    def _download_done(self, ids, downloaded_names=None):
         for tid in ids:
             self.new_tours.pop(tid, None)
         self.existing_ids = {tid for tid in (trip_id(f) for f in list_trips()) if tid}
@@ -804,4 +804,4 @@ class ImportWindowBase(tk.Toplevel):
         self.download_all_btn.config(state="normal")
         self.login_btn.config(state="normal")
         if self.on_downloaded:
-            self.on_downloaded()
+            self.on_downloaded(downloaded_names or [])
