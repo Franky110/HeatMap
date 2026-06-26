@@ -1,14 +1,15 @@
 """Build TripManager.exe using PyInstaller.
 
 Produces dist/TripManager.exe — a single self-contained Windows executable.
-Run via Build Exe.bat (or: python scripts/build_exe.py from the project root).
+Run via dev/Build Exe.bat (or: python dev/build_exe.py from the project root).
 """
 import os
 import subprocess
 import sys
 
-SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
-DIR = os.path.dirname(SCRIPTS_DIR)          # project root
+DEV_DIR = os.path.dirname(os.path.abspath(__file__))
+DIR = os.path.dirname(DEV_DIR)              # project root
+SCRIPTS_DIR = os.path.join(DIR, "scripts")
 KOMOOTGPX_DIR = os.path.join(os.path.dirname(DIR), "komootgpx")
 DIST_DIR = os.path.join(DIR, "dist")
 BUILD_DIR = os.path.join(DIR, "build")
@@ -54,7 +55,7 @@ if os.path.isdir(KOMOOTGPX_DIR):
 else:
     print(f"WARNING: komootgpx not found at {KOMOOTGPX_DIR} — Komoot import will not work in the exe")
 
-args.append(os.path.join(SCRIPTS_DIR, "main.py"))
+args.append(os.path.join(DIR, "scripts", "main.py"))
 
 print("Running PyInstaller...")
 result = subprocess.run(args, cwd=DIR)

@@ -10,8 +10,8 @@ setup.bat.
 import os
 import zipfile
 
-SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
-DIR = os.path.dirname(SCRIPTS_DIR)          # project root
+DEV_DIR = os.path.dirname(os.path.abspath(__file__))
+DIR = os.path.dirname(DEV_DIR)              # project root
 KOMOOTGPX_DIR = os.path.join(os.path.dirname(DIR), "komootgpx")
 OUTPUT_ZIP = os.path.join(DIR, "TripManager_release.zip")
 
@@ -23,6 +23,9 @@ EXCLUDE_DIRS = {
     ".git",          # version-control history
     ".claude",       # dev tooling
     ".vs",           # Visual Studio workspace
+    ".github",       # CI/CD config, not needed by end users
+    "dev",           # developer tools, not needed by end users
+    "tests",         # test suite, not needed by end users
     "processed",     # user's processed GPS data
     "raw_gpx",       # user's raw GPX files
     "trip_details",  # processed per-trip detail files
@@ -35,9 +38,9 @@ EXCLUDE_FILES = {
     "komoot_credentials.json",  # personal credentials — never share
     "osm_graph.pkl",
     os.path.basename(OUTPUT_ZIP),
-    "make_release.py",          # developer tool, not needed by end users
-    "build_exe.py",             # developer tool, not needed by end users
     "TripManager.spec",         # PyInstaller spec, not needed by end users
+    "requirements-dev.txt",     # dev dependencies only
+    "pytest.ini",
 }
 
 

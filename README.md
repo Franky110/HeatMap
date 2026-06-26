@@ -11,15 +11,15 @@ each trip's elevation, speed, heart rate, and cadence in an interactive dashboar
 ![Import window](docs/HeatMapMainWindow.png)
 - **Heatmap** — all your trips overlaid on an interactive map (Leaflet + OpenStreetMap)
 ![Heatmap](docs/HeatMapHTML.png)
-- **Trips** — See all your trips passing through a certain location
+- **Trips** — see all your trips passing through a certain location
 ![Trips](docs/TripsSelector.png)
 - **Dashboard** — per-trip charts for elevation, speed, heart rate, cadence, and power with a flexible layout (stack or combine any series, dual Y-axes)
-- **Segments** — define named stretches of road/trail and see a leaderboard of all trips through them, ranked fastest to slowest; compare two efforts side by side on the segment
-- **Compare mode** — overlay two trips (or two segment efforts) side by side to compare pace, elevation, power, and more
+- **Segments** — define named stretches of road/trail and see a leaderboard of all trips through them, ranked fastest to slowest; compare two efforts side by side
+- **Compare mode** — overlay two trips (or two segment efforts) to compare pace, elevation, power, and more
 - **X-axis toggle** — switch between distance and time on all charts at once
 - **Color modes** — line, gradient fill, or value-based coloring (green → red by speed)
 - **Data Wizard** — inspect and clean your trip library: filter by sport/date/source/sensor, detect color-coded duplicate pairs, delete raw or processed files
-- **Self-contained viewer** — `combined.html` works in any browser with no server required for offline use, or via the built-in local server for compressed data
+- **Android app** — view your heatmap on your phone via the companion Flutter app (`android_app/`)
 
 ## Requirements
 
@@ -51,6 +51,8 @@ each trip's elevation, speed, heart rate, and cadence in an interactive dashboar
 | **Garmin** | Click *Import from Garmin* — enter credentials and select a date range |
 | **Any GPX** | Click *Add files…* or *Add folder…* in the trip list |
 
+After a download completes you will be prompted to process and visualize the new trips immediately.
+
 ## Processing and viewing
 
 1. Select trips in the list (or use the date/sport/distance filters)
@@ -60,7 +62,7 @@ each trip's elevation, speed, heart rate, and cadence in an interactive dashboar
 ## Dashboard layout
 
 Click a trip on the map to open its dashboard. The **Layout ▾** button lets you:
-- Assign any series (speed, elevation, heart rate, cadence) to any chart slot
+- Assign any series (speed, elevation, heart rate, cadence, power) to any chart slot
 - Combine two series in one slot (dual Y-axes) or split them into separate charts
 - Choose line, gradient fill, or value-gradient color per series
 - Toggle the X-axis between distance and time
@@ -68,26 +70,56 @@ Click a trip on the map to open its dashboard. The **Layout ▾** button lets yo
 ## Project structure
 
 ```
-Trip Manager.bat        — launch the app
-Make Release.bat        — package a distributable zip
-setup.bat               — create the Python virtual environment (run once)
-combined.html           — the self-contained map + dashboard viewer
+Trip Manager.bat        — launch the app (Windows)
+trip_manager.sh         — launch the app (macOS / Linux)
+setup.bat               — first-time setup (Windows)
+setup.sh                — first-time setup (macOS / Linux)
+combined.html           — self-contained map + dashboard viewer (shared by desktop and Android)
 help.html               — in-app help page
-scripts/
+README.md               — this file
+LICENSE
+
+scripts/                — Python source (desktop app, all platforms)
   trip_manager.py       — main GUI (tkinter)
   combine_trips.py      — GPX parser and data builder
   komoot_import.py      — Komoot downloader
   strava_import.py      — Strava downloader
   garmin_import.py      — Garmin downloader
   data_wizard.py        — advanced data management
-  make_release.py       — builds the release zip
+  dpapi_utils.py        — cross-platform credential encryption
+  trip_utils.py         — shared GPX utilities
+  activity_import_base.py — shared import base class
+
+android_app/            — Flutter Android companion app
+  lib/                  — Dart source
+  android_patch/        — AndroidManifest + network security config
+  scripts/              — prepare_assets.bat / prepare_assets.sh
+  pubspec.yaml
+  README.md             — Android-specific setup guide
+
+docs/                   — screenshots and documentation assets
+
+dev/                    — developer tools (not needed for normal use)
+  Build Exe.bat         — build TripManager.exe via PyInstaller (Windows)
+  Make Release.bat      — package a distributable zip (Windows)
+  make_release.sh       — package a distributable zip (macOS / Linux)
+  build_exe.py          — PyInstaller build script
+  make_release.py       — release packaging script
+
+tests/                  — automated test suite (pytest)
 ```
 
 ## Data and privacy
 
 Your personal data (GPX files, processed maps, credentials) is stored in a folder **you choose**,
-separate from the program folder. It is never uploaded anywhere. Komoot credentials are stored
-locally using Windows DPAPI encryption and are excluded from any release zip.
+separate from the program folder. It is never uploaded anywhere. Credentials are encrypted locally
+(DPAPI on Windows, `chmod 600` on macOS/Linux) and are excluded from any release zip.
+
+## Android companion app
+
+See [`android_app/README.md`](android_app/README.md) for setup instructions.
+The app serves your processed trip data over a local HTTP server and displays the full heatmap
+in an embedded WebView — the same map and dashboard as the desktop browser version.
 
 ## Contributing
 
