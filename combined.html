@@ -34,26 +34,35 @@
   #dashboard button { cursor: pointer; }
   #dashboard-message { color: #555; padding: 6px 0; font-style: italic; }
 
-  /* Layout panel */
-  #layout-panel {
-    background: #fafafa; border: 1px solid #e0e0e0; border-radius: 4px;
-    padding: 8px 10px; margin-bottom: 6px; font-size: 12px;
+  /* Touch-first chart controls — tap a Y chip to cycle its series, tap the
+     × to clear a chart, tap the dashed tile to add the next hidden series. */
+  .chart-slot-header { display: flex; align-items: center; gap: 4px; margin-bottom: 2px; flex-wrap: wrap; }
+  .chart-y-chip {
+    font-size: 11px; padding: 2px 7px; border-radius: 10px; cursor: pointer;
+    background: #eee; color: #333; border: 1px solid #ddd; user-select: none;
   }
-  #layout-panel table { border-collapse: collapse; width: 100%; }
-  #layout-panel th {
-    font-size: 11px; color: #777; font-weight: normal;
-    padding: 2px 6px; text-align: center; white-space: nowrap;
+  .chart-y-chip:active { background: #ddd; }
+  .chart-remove-btn {
+    margin-left: auto; cursor: pointer; color: #999; font-size: 15px; line-height: 1;
+    padding: 0 4px; user-select: none;
   }
-  #layout-panel td { padding: 2px 4px; white-space: nowrap; }
-  #layout-panel td.series-name { font-weight: 500; padding-right: 8px; color: #333; }
-  #layout-panel td.unavailable { opacity: 0.35; }
-  #layout-panel input[type=radio] { cursor: pointer; }
-  #layout-panel select { font-size: 11px; padding: 1px 3px; border: 1px solid #ccc;
-    border-radius: 3px; background: white; cursor: pointer; }
-  .layout-slot-ctrl { margin-top: 6px; display: flex; align-items: center; gap: 8px;
-    border-top: 1px solid #eee; padding-top: 6px; }
-  .layout-slot-ctrl button { font-size: 11px; padding: 1px 8px; }
-  .layout-slot-ctrl span { color: #555; font-size: 11px; }
+  .chart-remove-btn:hover { color: #c62828; }
+  .chart-add-tile {
+    flex: 1; min-width: 0; border: 2px dashed #ccc; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    color: #999; font-size: 28px; cursor: pointer; user-select: none;
+  }
+  .chart-add-tile:hover { background: #fafafa; color: #1976d2; border-color: #1976d2; }
+  #x-axis-toggle {
+    text-align: center; font-size: 11px; color: #888; cursor: pointer;
+    padding: 4px 0; user-select: none;
+  }
+  #x-axis-toggle:hover { color: #1976d2; }
+  .icon-close {
+    background: none; border: none; font-size: 20px; line-height: 1; color: #888;
+    padding: 0 4px; cursor: pointer;
+  }
+  .icon-close:hover { color: #c62828; }
 
   #dashboard-stats, #dashboard-stats-b {
     display: grid;
@@ -293,16 +302,13 @@
   <div id="dashboard-header">
     <strong id="dashboard-title">Trip details</strong>
     <div class="btn-group">
-      <button id="layout-btn" type="button">Layout ▾</button>
-      <button id="dashboard-xtoggle" type="button">X: Distance</button>
       <button id="dashboard-compare" type="button">Compare</button>
-      <button id="dashboard-back" type="button">Back to list</button>
-      <button id="dashboard-close" type="button">Close</button>
+      <button id="dashboard-close" type="button" class="icon-close" title="Close" aria-label="Close">&times;</button>
     </div>
   </div>
-  <div id="layout-panel" style="display:none;"></div>
   <div id="dashboard-message" style="display:none;"></div>
   <div id="dashboard-charts"></div>
+  <div id="x-axis-toggle" title="Tap to switch between distance and time">Distance ⇄ Time</div>
 
   <div id="stats-area">
     <div id="compare-col-a" class="compare-col">
@@ -462,7 +468,12 @@ var TracksCanvasLayer = L.Layer.extend({
   _resetNow: function () {
     this._rf = null;
     var m = this._map, sz = m.getSize();
-    if (!sz.x || !sz.y) return;
+    if (!sz.x || !sz.y) {
+      // Container can briefly report 0x0 before layout settles (seen in
+      // Android WebView embeddings) — retry instead of giving up forever.
+      this._reset();
+      return;
+    }
     L.DomUtil.setTransform(this._canvas, new L.Point(0, 0), 1);
     this._canvas.width = sz.x; this._canvas.height = sz.y;
     this._canvas.style.width = sz.x + 'px'; this._canvas.style.height = sz.y + 'px';
@@ -645,7 +656,15 @@ function showTripList(tripIdxs) {
     div.className = 'trip-list-item';
     div.dataset.idx = idx;
     div.textContent = m.date + ' — ' + m.distanceKm + ' km' + (m.sport ? ' — ' + m.sport : '');
-    div.addEventListener('click', function () { highlightTrip(idx); });
+    // Tapping the already-open trip again closes its dashboard (replaces
+    // the removed "Close" button — the trip list itself stays visible).
+    div.addEventListener('click', function () {
+      if (currentTripIdx === idx && document.getElementById('dashboard').classList.contains('visible')) {
+        closeDashboard();
+      } else {
+        highlightTrip(idx);
+      }
+    });
     el.appendChild(div);
   });
   document.getElementById('trip-list-wrap').style.display = 'block';
@@ -992,98 +1011,53 @@ function chartForCanvas(canvas) {
   return null;
 }
 
-// ── layout panel ──────────────────────────────────────────────────────────────
-var layoutPanelOpen = false;
-
-function renderLayoutPanel() {
-  var panel = document.getElementById('layout-panel');
-  var available = {
+// ── direct chart manipulation (tap a chip / × / dashed tile — no separate
+// "Layout" panel; inspired by Garmin Connect / Strava's chart screens) ────────
+function seriesAvailability() {
+  return {
     elev: true, spd: true,
-    hr:  !!(currentDetail && currentDetail.hr  || compareDetail && compareDetail && compareDetail.hr),
-    cad: !!(currentDetail && currentDetail.cad || compareDetail && compareDetail && compareDetail.cad),
-    pwr: !!(currentDetail && currentDetail.pwr || compareDetail && compareDetail && compareDetail.pwr)
+    hr:  !!(currentDetail && currentDetail.hr  || compareDetail && compareDetail.hr),
+    cad: !!(currentDetail && currentDetail.cad || compareDetail && compareDetail.cad),
+    pwr: !!(currentDetail && currentDetail.pwr || compareDetail && compareDetail.pwr)
   };
-
-  var html = '<table><thead><tr><th></th>';
-  for (var s = 0; s < numSlots; s++) html += '<th>Chart ' + (s + 1) + '</th>';
-  html += '<th>Hidden</th><th style="padding-left:10px">Style</th></tr></thead><tbody>';
-
-  SERIES_KEYS.forEach(function (key) {
-    var avail = available[key];
-    html += '<tr' + (avail ? '' : ' class="unavailable"') + '>';
-    html += '<td class="series-name">' + SERIES_LABEL[key] + '</td>';
-    for (var s = 0; s < numSlots; s++) {
-      html += '<td style="text-align:center"><input type="radio" name="slot-' + key + '" value="' + s + '"' +
-        (slotAssignment[key] === s ? ' checked' : '') +
-        (avail ? '' : ' disabled') + '></td>';
-    }
-    html += '<td style="text-align:center"><input type="radio" name="slot-' + key + '" value="-1"' +
-      (slotAssignment[key] === -1 ? ' checked' : '') +
-      (avail ? '' : ' disabled') + '></td>';
-
-    // Style selector
-    var modes = COLOR_MODES[key];
-    html += '<td style="padding-left:10px"><select data-key="' + key + '"' + (avail ? '' : ' disabled') + '>';
-    modes.forEach(function (m) {
-      var label = m === 'line' ? 'Line' : m === 'fill' ? 'Fill ▓' : 'Value ≋';
-      html += '<option value="' + m + '"' + (chartColorMode[key] === m ? ' selected' : '') + '>' + label + '</option>';
-    });
-    html += '</select></td></tr>';
-  });
-
-  html += '</tbody></table>';
-  html += '<div class="layout-slot-ctrl">';
-  html += '<button id="layout-fewer" ' + (numSlots <= 1 ? 'disabled' : '') + '>− Chart</button>';
-  html += '<span>' + numSlots + ' chart' + (numSlots > 1 ? 's' : '') + '</span>';
-  html += '<button id="layout-more" ' + (numSlots >= MAX_SLOTS ? 'disabled' : '') + '>+ Chart</button>';
-  html += '</div>';
-
-  panel.innerHTML = html;
-
-  // Wire up radio buttons
-  SERIES_KEYS.forEach(function (key) {
-    panel.querySelectorAll('input[name="slot-' + key + '"]').forEach(function (radio) {
-      radio.addEventListener('change', function () {
-        slotAssignment[key] = parseInt(this.value, 10);
-        if (currentDetail) renderDashboard();
-      });
-    });
-  });
-
-  // Wire up style selects
-  panel.querySelectorAll('select[data-key]').forEach(function (sel) {
-    sel.addEventListener('change', function () {
-      chartColorMode[this.dataset.key] = this.value;
-      if (currentDetail) renderDashboard();
-    });
-  });
-
-  // Slot count buttons
-  var fewerBtn = document.getElementById('layout-fewer');
-  var moreBtn  = document.getElementById('layout-more');
-  if (fewerBtn) fewerBtn.addEventListener('click', function () {
-    if (numSlots <= 1) return;
-    numSlots--;
-    // Move any series assigned to the removed slot to the last remaining slot
-    SERIES_KEYS.forEach(function (k) { if (slotAssignment[k] >= numSlots) slotAssignment[k] = numSlots - 1; });
-    renderLayoutPanel();
-    if (currentDetail) renderDashboard();
-  });
-  if (moreBtn) moreBtn.addEventListener('click', function () {
-    if (numSlots >= MAX_SLOTS) return;
-    numSlots++;
-    renderLayoutPanel();
-    if (currentDetail) renderDashboard();
-  });
 }
 
-document.getElementById('layout-btn').addEventListener('click', function () {
-  layoutPanelOpen = !layoutPanelOpen;
-  var panel = document.getElementById('layout-panel');
-  if (layoutPanelOpen) { renderLayoutPanel(); panel.style.display = ''; }
-  else panel.style.display = 'none';
-  this.textContent = layoutPanelOpen ? 'Layout ▴' : 'Layout ▾';
-});
+// Tapping a Y chip advances that chart to the next available series,
+// swapping slot positions with whichever chart currently shows it so no
+// series is ever lost — just reordered.
+function cycleSeriesInSlot(currentKey) {
+  var available = seriesAvailability();
+  var order = SERIES_KEYS.filter(function (k) { return available[k]; });
+  if (order.length < 2) return;
+  var i = order.indexOf(currentKey);
+  var nextKey = order[(i + 1) % order.length];
+  if (nextKey === currentKey) return;
+  var tmp = slotAssignment[nextKey];
+  slotAssignment[nextKey] = slotAssignment[currentKey];
+  slotAssignment[currentKey] = tmp;
+  renderDashboard();
+}
+
+// "×" on a chart clears every series shown in that slot (hides the chart).
+function clearSlot(slotIdx) {
+  SERIES_KEYS.forEach(function (k) { if (slotAssignment[k] === slotIdx) slotAssignment[k] = -1; });
+  renderDashboard();
+}
+
+// Dashed "+" tile: reveals the next hidden-but-available series in a new slot.
+function addNextHiddenSeries() {
+  var available = seriesAvailability();
+  var hidden = SERIES_KEYS.filter(function (k) { return available[k] && slotAssignment[k] < 0; });
+  if (!hidden.length || numSlots >= MAX_SLOTS) return;
+  slotAssignment[hidden[0]] = numSlots;
+  numSlots++;
+  renderDashboard();
+}
+
+function hasHiddenAvailableSeries() {
+  var available = seriesAvailability();
+  return SERIES_KEYS.some(function (k) { return available[k] && slotAssignment[k] < 0; }) && numSlots < MAX_SLOTS;
+}
 
 // ── color mode helpers ────────────────────────────────────────────────────────
 function hexToRgba(hex, alpha) {
@@ -1401,6 +1375,8 @@ function renderDashboard() {
   var xMaxAll = Math.max(xs.length ? xs[xs.length - 1] : 0, cxs && cxs.length ? cxs[cxs.length - 1] : 0);
   var step   = niceStep(xMaxAll);
   var xLabel = xMode === 'time' ? 'Time (min)' : 'Distance (km)';
+  var xToggleEl = document.getElementById('x-axis-toggle');
+  if (xToggleEl) xToggleEl.textContent = 'X axis: ' + xLabel + ' (tap to switch)';
 
   var sport = currentTripIdx != null ? tripSport(currentTripIdx) : 'Unknown';
   var speedSuggestedMax = SPORT_SPEED_SCALE[sport] || 60;
@@ -1440,18 +1416,42 @@ function renderDashboard() {
     activeSlotIndices = Object.keys(splitSlots).map(Number);
   }
 
-  // Refresh layout panel if open (availability may have changed)
-  if (layoutPanelOpen) renderLayoutPanel();
-
   activeSlotIndices.forEach(function (slotIdx) {
     var keys = slotSeries[slotIdx];
 
     // Create container + canvas
     var wrap = document.createElement('div');
-    wrap.style.cssText = 'flex:1;min-width:0;';
+    wrap.style.cssText = 'flex:1;min-width:0;display:flex;flex-direction:column;';
+
+    // Touch-first header: tap a chip to cycle that chart's series, tap ×
+    // to clear the chart. Hidden during compare mode, where slots are
+    // auto-split per series and reassigning would conflict with that.
+    if (compareTripIdx == null) {
+      var header = document.createElement('div');
+      header.className = 'chart-slot-header';
+      keys.forEach(function (key) {
+        var chip = document.createElement('span');
+        chip.className = 'chart-y-chip';
+        chip.textContent = SERIES_LABEL[key];
+        chip.title = 'Tap to change what this chart shows';
+        chip.addEventListener('click', function () { cycleSeriesInSlot(key); });
+        header.appendChild(chip);
+      });
+      var removeBtn = document.createElement('span');
+      removeBtn.className = 'chart-remove-btn';
+      removeBtn.textContent = '×';
+      removeBtn.title = 'Remove this chart';
+      removeBtn.addEventListener('click', function () { clearSlot(slotIdx); });
+      header.appendChild(removeBtn);
+      wrap.appendChild(header);
+    }
+
+    var canvasWrap = document.createElement('div');
+    canvasWrap.style.cssText = 'flex:1;min-height:0;position:relative;';
     var canvas = document.createElement('canvas');
     canvas.id = 'chart-slot-' + slotIdx;
-    wrap.appendChild(canvas);
+    canvasWrap.appendChild(canvas);
+    wrap.appendChild(canvasWrap);
     slotsEl.appendChild(wrap);
 
     // Build datasets: all Trip-A first, then all Trip-B (for clean cursor indexing)
@@ -1518,6 +1518,15 @@ function renderDashboard() {
 
     attachSlotListeners(canvas);
   });
+
+  if (compareTripIdx == null && hasHiddenAvailableSeries()) {
+    var addTile = document.createElement('div');
+    addTile.className = 'chart-add-tile';
+    addTile.textContent = '+';
+    addTile.title = 'Add a chart';
+    addTile.addEventListener('click', addNextHiddenSeries);
+    slotsEl.appendChild(addTile);
+  }
 
   updateDashboardStats();
   updateMapSelectionLayer();
@@ -1629,9 +1638,8 @@ function unselectTrip() {
 }
 
 // ── dashboard buttons ─────────────────────────────────────────────────────────
-document.getElementById('dashboard-xtoggle').addEventListener('click', function () {
+document.getElementById('x-axis-toggle').addEventListener('click', function () {
   xMode = xMode === 'distance' ? 'time' : 'distance';
-  this.textContent = 'X: ' + (xMode === 'distance' ? 'Distance' : 'Time');
   if (currentDetail) {
     compareXs = compareDetail ? xValues(compareDetail) : null;
     renderDashboard();
@@ -1656,21 +1664,18 @@ document.getElementById('dashboard-compare').addEventListener('click', function 
   }
 });
 
-
-document.getElementById('dashboard-back').addEventListener('click', function () {
-  unselectTrip();
-  exitComparePickMode();
-  document.getElementById('dashboard').classList.remove('visible');
-  document.getElementById('trip-list-wrap').style.display = 'block';
-});
-
-document.getElementById('dashboard-close').addEventListener('click', function () {
+// Closing the dashboard no longer hides the nearby-trips list — it always
+// stays visible per the map-click flow (see showTripList()). The list is
+// the only "back" affordance needed now, so the separate "Back to list"
+// button was removed; tapping the same trip again also closes (see
+// showTripList()'s click handler).
+function closeDashboard() {
   document.getElementById('dashboard').classList.remove('visible');
   unselectTrip();
   exitComparePickMode();
-  if (clickCircle) { map.removeLayer(clickCircle); clickCircle = null; }
-  document.getElementById('trip-list-wrap').style.display = 'none';
-});
+}
+
+document.getElementById('dashboard-close').addEventListener('click', closeDashboard);
 
 // ── filters ───────────────────────────────────────────────────────────────────
 document.getElementById('show-tracks').addEventListener('change', function (e) {
