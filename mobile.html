@@ -1922,7 +1922,20 @@ function initApp(data) {
     setTimeout(function () {
       tracksLayer = new TracksCanvasLayer(); tracksLayer.addTo(map); raiseHighlightLayers();
       if (MINI_MODE && !isNaN(MINI_LAT) && !isNaN(MINI_LON)) {
-        map.setView([MINI_LAT, MINI_LON], 12);
+        // Default to a 200x200km box centered on the device, but zoom in
+        // tighter to the trips' own bounds when all of them fit inside a
+        // smaller area.
+        var halfLat = 100 / 111; // ~111km per degree of latitude
+        var halfLon = 100 / (111 * Math.cos(MINI_LAT * Math.PI / 180));
+        var capBounds = L.latLngBounds(
+          [MINI_LAT - halfLat, MINI_LON - halfLon],
+          [MINI_LAT + halfLat, MINI_LON + halfLon]
+        );
+        if (bounds.isValid() && capBounds.contains(bounds)) {
+          map.fitBounds(bounds);
+        } else {
+          map.fitBounds(capBounds);
+        }
       } else if (bounds.isValid()) {
         map.fitBounds(bounds);
       }
