@@ -19,41 +19,89 @@
   #info input[type=range] { flex: 1; }
   hr { border: none; border-top: 1px solid #ddd; margin: 8px 0; }
 
+  /* Mobile dashboard is a full-screen scrollable "page" over the map
+     (not a small bottom panel) — Compare collapses it back to the map,
+     see enterComparePickMode()/exitComparePickMode(). */
   #dashboard {
-    position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 1000;
-    background: white; border-radius: 4px; box-shadow: 0 1px 5px rgba(0,0,0,0.4);
-    font-family: sans-serif; font-size: 13px; padding: 8px 12px; display: none;
+    position: absolute; left: 0; right: 0; top: 0; bottom: 0; z-index: 1100;
+    background: white; font-family: sans-serif; font-size: 13px;
+    display: none; overflow-y: auto; -webkit-overflow-scrolling: touch;
   }
   #dashboard.visible { display: block; }
   #dashboard-header {
-    display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;
+    position: sticky; top: 0; z-index: 2; background: white;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.15);
   }
   #dashboard-header .btn-group { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
-  #dashboard-charts { display: flex; gap: 12px; height: 160px; }
-  #dashboard-charts > div { flex: 1; min-width: 0; }
+  #dashboard-body { padding: 4px 12px 24px; }
   #dashboard button { cursor: pointer; }
   #dashboard-message { color: #555; padding: 6px 0; font-style: italic; }
 
-  /* Layout panel */
-  #layout-panel {
-    background: #fafafa; border: 1px solid #e0e0e0; border-radius: 4px;
-    padding: 8px 10px; margin-bottom: 6px; font-size: 12px;
+  /* Charts stack vertically by default (portrait); once the screen is
+     wide enough for two side by side, wrap into a 2-column grid. */
+  #dashboard-charts { display: flex; flex-direction: column; gap: 16px; }
+  #dashboard-charts > .chart-wrap { width: 100%; height: 220px; display: flex; flex-direction: column; }
+  @media (min-width: 620px) {
+    #dashboard-charts { flex-direction: row; flex-wrap: wrap; }
+    #dashboard-charts > .chart-wrap { width: calc(50% - 8px); }
   }
-  #layout-panel table { border-collapse: collapse; width: 100%; }
-  #layout-panel th {
-    font-size: 11px; color: #777; font-weight: normal;
-    padding: 2px 6px; text-align: center; white-space: nowrap;
+
+  /* Touch-first chart controls — tap a Y chip to open the series picker,
+     tap × to clear a chart. The x-axis label under each chart is itself
+     the distance/time toggle (no separate toggle row). */
+  .chart-slot-header { display: flex; align-items: center; gap: 4px; margin-bottom: 2px; flex-wrap: wrap; }
+  .chart-y-chip {
+    font-size: 12px; padding: 3px 9px; border-radius: 10px; cursor: pointer;
+    background: #eee; color: #333; border: 1px solid #ddd; user-select: none;
   }
-  #layout-panel td { padding: 2px 4px; white-space: nowrap; }
-  #layout-panel td.series-name { font-weight: 500; padding-right: 8px; color: #333; }
-  #layout-panel td.unavailable { opacity: 0.35; }
-  #layout-panel input[type=radio] { cursor: pointer; }
-  #layout-panel select { font-size: 11px; padding: 1px 3px; border: 1px solid #ccc;
-    border-radius: 3px; background: white; cursor: pointer; }
-  .layout-slot-ctrl { margin-top: 6px; display: flex; align-items: center; gap: 8px;
-    border-top: 1px solid #eee; padding-top: 6px; }
-  .layout-slot-ctrl button { font-size: 11px; padding: 1px 8px; }
-  .layout-slot-ctrl span { color: #555; font-size: 11px; }
+  .chart-y-chip:active { background: #ddd; }
+  .chart-remove-btn {
+    margin-left: auto; cursor: pointer; color: #999; font-size: 17px; line-height: 1;
+    padding: 0 6px; user-select: none;
+  }
+  .chart-remove-btn:hover { color: #c62828; }
+  .chart-x-label {
+    text-align: center; font-size: 11px; color: #888; cursor: pointer;
+    padding: 4px 0; user-select: none;
+  }
+  .chart-x-label:hover, .chart-x-label:active { color: #1976d2; }
+
+  /* Series picker — opened by tapping a Y chip; lets you replace this
+     chart's series or add another series on a secondary Y axis. */
+  .series-picker {
+    position: fixed; z-index: 1200; background: white; border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3); padding: 6px; min-width: 200px;
+    font-size: 13px; max-height: 70vh; overflow-y: auto;
+  }
+  .series-picker-hint { color: #888; font-size: 11px; padding: 2px 8px 6px; }
+  .series-picker-row { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+  .series-picker-replace {
+    flex: 1; text-align: left; padding: 8px 10px; border-radius: 6px; border: none;
+    background: none; font-size: 13px; cursor: pointer;
+  }
+  .series-picker-replace:active { background: #f0f0f0; }
+  .series-picker-replace.current { font-weight: bold; color: #1976d2; }
+  .series-picker-add {
+    padding: 6px 10px; border-radius: 6px; border: 1px solid #1976d2; color: #1976d2;
+    background: none; font-size: 12px; cursor: pointer; white-space: nowrap;
+  }
+  .series-picker-add:active { background: #e3f2fd; }
+
+  /* + / − chart controls — always rendered right below the last chart. */
+  #chart-controls-row { display: flex; gap: 10px; margin-top: 14px; }
+  #chart-controls-row button {
+    flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #ccc;
+    background: #fafafa; font-size: 14px; color: #333;
+  }
+  #chart-controls-row button:disabled { color: #bbb; border-color: #e0e0e0; background: #f5f5f5; }
+  #chart-controls-row button:not(:disabled):active { background: #eee; }
+
+  .icon-close {
+    background: none; border: none; font-size: 20px; line-height: 1; color: #888;
+    padding: 0 4px; cursor: pointer;
+  }
+  .icon-close:hover { color: #c62828; }
 
   #dashboard-stats, #dashboard-stats-b {
     display: grid;
@@ -293,14 +341,11 @@
   <div id="dashboard-header">
     <strong id="dashboard-title">Trip details</strong>
     <div class="btn-group">
-      <button id="layout-btn" type="button">Layout ▾</button>
-      <button id="dashboard-xtoggle" type="button">X: Distance</button>
       <button id="dashboard-compare" type="button">Compare</button>
-      <button id="dashboard-back" type="button">Back to list</button>
-      <button id="dashboard-close" type="button">Close</button>
+      <button id="dashboard-close" type="button" class="icon-close" title="Close" aria-label="Close">&times;</button>
     </div>
   </div>
-  <div id="layout-panel" style="display:none;"></div>
+  <div id="dashboard-body">
   <div id="dashboard-message" style="display:none;"></div>
   <div id="dashboard-charts"></div>
 
@@ -345,6 +390,7 @@
         <div class="stat" id="stat-b-pwr-row" style="display:none"><span class="stat-label">Avg power</span><span class="stat-value"><span id="stat-b-pwr">-</span><span id="stat-b-pwr-diff" class="stat-diff"></span></span></div>
       </div>
     </div>
+  </div>
   </div>
 </div>
 
@@ -462,7 +508,12 @@ var TracksCanvasLayer = L.Layer.extend({
   _resetNow: function () {
     this._rf = null;
     var m = this._map, sz = m.getSize();
-    if (!sz.x || !sz.y) return;
+    if (!sz.x || !sz.y) {
+      // Container can briefly report 0x0 before layout settles (seen in
+      // Android WebView embeddings) — retry instead of giving up forever.
+      this._reset();
+      return;
+    }
     L.DomUtil.setTransform(this._canvas, new L.Point(0, 0), 1);
     this._canvas.width = sz.x; this._canvas.height = sz.y;
     this._canvas.style.width = sz.x + 'px'; this._canvas.style.height = sz.y + 'px';
@@ -645,7 +696,15 @@ function showTripList(tripIdxs) {
     div.className = 'trip-list-item';
     div.dataset.idx = idx;
     div.textContent = m.date + ' — ' + m.distanceKm + ' km' + (m.sport ? ' — ' + m.sport : '');
-    div.addEventListener('click', function () { highlightTrip(idx); });
+    // Tapping the already-open trip again closes its dashboard (replaces
+    // the removed "Close" button — the trip list itself stays visible).
+    div.addEventListener('click', function () {
+      if (currentTripIdx === idx && document.getElementById('dashboard').classList.contains('visible')) {
+        closeDashboard();
+      } else {
+        highlightTrip(idx);
+      }
+    });
     el.appendChild(div);
   });
   document.getElementById('trip-list-wrap').style.display = 'block';
@@ -778,6 +837,9 @@ function enterComparePickMode(slot) {
   document.getElementById('trip-list-title').textContent = 'Pick a trip to replace ' + label;
   document.getElementById('trip-list-wrap').style.display = 'block';
   document.getElementById('compare-col-' + slot).classList.add('picking');
+  // Collapse the full-screen dashboard so the map is tappable again to
+  // pick the second trip; restored by whatever calls exitComparePickMode().
+  document.getElementById('dashboard').classList.remove('visible');
   if (lastFoundTrips.length > 0) showTripListForCompare(lastFoundTrips);
 }
 
@@ -796,6 +858,7 @@ function replaceCompareSlot(idx) {
   if (!comparePickMode) return; // stale handler — pick mode already exited (e.g. double-click)
   var slot = comparePickSlot;
   exitComparePickMode();
+  document.getElementById('dashboard').classList.add('visible'); // picked — restore the dashboard
 
   if (slot === 'b' || slot == null) {
     // Replace / set trip B
@@ -992,98 +1055,117 @@ function chartForCanvas(canvas) {
   return null;
 }
 
-// ── layout panel ──────────────────────────────────────────────────────────────
-var layoutPanelOpen = false;
-
-function renderLayoutPanel() {
-  var panel = document.getElementById('layout-panel');
-  var available = {
+// ── direct chart manipulation (tap a chip / × / dashed tile — no separate
+// "Layout" panel; inspired by Garmin Connect / Strava's chart screens) ────────
+function seriesAvailability() {
+  return {
     elev: true, spd: true,
-    hr:  !!(currentDetail && currentDetail.hr  || compareDetail && compareDetail && compareDetail.hr),
-    cad: !!(currentDetail && currentDetail.cad || compareDetail && compareDetail && compareDetail.cad),
-    pwr: !!(currentDetail && currentDetail.pwr || compareDetail && compareDetail && compareDetail.pwr)
+    hr:  !!(currentDetail && currentDetail.hr  || compareDetail && compareDetail.hr),
+    cad: !!(currentDetail && currentDetail.cad || compareDetail && compareDetail.cad),
+    pwr: !!(currentDetail && currentDetail.pwr || compareDetail && compareDetail.pwr)
   };
-
-  var html = '<table><thead><tr><th></th>';
-  for (var s = 0; s < numSlots; s++) html += '<th>Chart ' + (s + 1) + '</th>';
-  html += '<th>Hidden</th><th style="padding-left:10px">Style</th></tr></thead><tbody>';
-
-  SERIES_KEYS.forEach(function (key) {
-    var avail = available[key];
-    html += '<tr' + (avail ? '' : ' class="unavailable"') + '>';
-    html += '<td class="series-name">' + SERIES_LABEL[key] + '</td>';
-    for (var s = 0; s < numSlots; s++) {
-      html += '<td style="text-align:center"><input type="radio" name="slot-' + key + '" value="' + s + '"' +
-        (slotAssignment[key] === s ? ' checked' : '') +
-        (avail ? '' : ' disabled') + '></td>';
-    }
-    html += '<td style="text-align:center"><input type="radio" name="slot-' + key + '" value="-1"' +
-      (slotAssignment[key] === -1 ? ' checked' : '') +
-      (avail ? '' : ' disabled') + '></td>';
-
-    // Style selector
-    var modes = COLOR_MODES[key];
-    html += '<td style="padding-left:10px"><select data-key="' + key + '"' + (avail ? '' : ' disabled') + '>';
-    modes.forEach(function (m) {
-      var label = m === 'line' ? 'Line' : m === 'fill' ? 'Fill ▓' : 'Value ≋';
-      html += '<option value="' + m + '"' + (chartColorMode[key] === m ? ' selected' : '') + '>' + label + '</option>';
-    });
-    html += '</select></td></tr>';
-  });
-
-  html += '</tbody></table>';
-  html += '<div class="layout-slot-ctrl">';
-  html += '<button id="layout-fewer" ' + (numSlots <= 1 ? 'disabled' : '') + '>− Chart</button>';
-  html += '<span>' + numSlots + ' chart' + (numSlots > 1 ? 's' : '') + '</span>';
-  html += '<button id="layout-more" ' + (numSlots >= MAX_SLOTS ? 'disabled' : '') + '>+ Chart</button>';
-  html += '</div>';
-
-  panel.innerHTML = html;
-
-  // Wire up radio buttons
-  SERIES_KEYS.forEach(function (key) {
-    panel.querySelectorAll('input[name="slot-' + key + '"]').forEach(function (radio) {
-      radio.addEventListener('change', function () {
-        slotAssignment[key] = parseInt(this.value, 10);
-        if (currentDetail) renderDashboard();
-      });
-    });
-  });
-
-  // Wire up style selects
-  panel.querySelectorAll('select[data-key]').forEach(function (sel) {
-    sel.addEventListener('change', function () {
-      chartColorMode[this.dataset.key] = this.value;
-      if (currentDetail) renderDashboard();
-    });
-  });
-
-  // Slot count buttons
-  var fewerBtn = document.getElementById('layout-fewer');
-  var moreBtn  = document.getElementById('layout-more');
-  if (fewerBtn) fewerBtn.addEventListener('click', function () {
-    if (numSlots <= 1) return;
-    numSlots--;
-    // Move any series assigned to the removed slot to the last remaining slot
-    SERIES_KEYS.forEach(function (k) { if (slotAssignment[k] >= numSlots) slotAssignment[k] = numSlots - 1; });
-    renderLayoutPanel();
-    if (currentDetail) renderDashboard();
-  });
-  if (moreBtn) moreBtn.addEventListener('click', function () {
-    if (numSlots >= MAX_SLOTS) return;
-    numSlots++;
-    renderLayoutPanel();
-    if (currentDetail) renderDashboard();
-  });
 }
 
-document.getElementById('layout-btn').addEventListener('click', function () {
-  layoutPanelOpen = !layoutPanelOpen;
-  var panel = document.getElementById('layout-panel');
-  if (layoutPanelOpen) { renderLayoutPanel(); panel.style.display = ''; }
-  else panel.style.display = 'none';
-  this.textContent = layoutPanelOpen ? 'Layout ▴' : 'Layout ▾';
-});
+// Tapping a Y chip opens a picker: pick a series to REPLACE this chip's
+// series, or tap "+" next to a series to ADD it as another Y axis on the
+// same chart (up to 4 series per chart, see yAxisIDs in renderDashboard).
+function replaceSeriesInSlot(currentKey, newKey) {
+  if (newKey === currentKey) return;
+  var tmp = slotAssignment[newKey];
+  slotAssignment[newKey] = slotAssignment[currentKey];
+  slotAssignment[currentKey] = tmp;
+  renderDashboard();
+}
+
+function addSeriesToSlot(slotIdx, newKey) {
+  slotAssignment[newKey] = slotIdx;
+  renderDashboard();
+}
+
+function closeSeriesPicker() {
+  var m = document.getElementById('series-picker');
+  if (m) m.remove();
+  document.removeEventListener('click', closeSeriesPickerOnce, true);
+}
+
+function closeSeriesPickerOnce(e) {
+  var m = document.getElementById('series-picker');
+  if (m && !m.contains(e.target)) closeSeriesPicker();
+}
+
+function openSeriesPicker(slotIdx, currentKey, anchorEl) {
+  closeSeriesPicker();
+  var available = seriesAvailability();
+  var order = SERIES_KEYS.filter(function (k) { return available[k]; });
+  var menu = document.createElement('div');
+  menu.id = 'series-picker';
+  menu.className = 'series-picker';
+  var hint = document.createElement('div');
+  hint.className = 'series-picker-hint';
+  hint.textContent = 'Tap a name to replace, or + to add as another axis';
+  menu.appendChild(hint);
+  order.forEach(function (k) {
+    var row = document.createElement('div');
+    row.className = 'series-picker-row';
+    var replaceBtn = document.createElement('button');
+    replaceBtn.type = 'button';
+    replaceBtn.textContent = SERIES_LABEL[k];
+    replaceBtn.className = 'series-picker-replace' + (k === currentKey ? ' current' : '');
+    replaceBtn.addEventListener('click', function () { replaceSeriesInSlot(currentKey, k); closeSeriesPicker(); });
+    row.appendChild(replaceBtn);
+    if (k !== currentKey && slotAssignment[k] !== slotIdx) {
+      var addBtn = document.createElement('button');
+      addBtn.type = 'button';
+      addBtn.textContent = '+ add';
+      addBtn.className = 'series-picker-add';
+      addBtn.addEventListener('click', function () { addSeriesToSlot(slotIdx, k); closeSeriesPicker(); });
+      row.appendChild(addBtn);
+    }
+    menu.appendChild(row);
+  });
+  document.body.appendChild(menu);
+  var rect = anchorEl.getBoundingClientRect();
+  var left = Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8);
+  var top = Math.min(rect.bottom + 4, window.innerHeight - menu.offsetHeight - 8);
+  menu.style.left = Math.max(8, left) + 'px';
+  menu.style.top = Math.max(8, top) + 'px';
+  setTimeout(function () { document.addEventListener('click', closeSeriesPickerOnce, true); }, 0);
+}
+
+// "×" on a chart clears every series shown in that slot (hides the chart).
+function clearSlot(slotIdx) {
+  SERIES_KEYS.forEach(function (k) { if (slotAssignment[k] === slotIdx) slotAssignment[k] = -1; });
+  renderDashboard();
+}
+
+// "+ Add chart" button: reveals the next hidden-but-available series in a new slot.
+function addNextHiddenSeries() {
+  var available = seriesAvailability();
+  var hidden = SERIES_KEYS.filter(function (k) { return available[k] && slotAssignment[k] < 0; });
+  if (!hidden.length || numSlots >= MAX_SLOTS) return;
+  slotAssignment[hidden[0]] = numSlots;
+  numSlots++;
+  renderDashboard();
+}
+
+function hasHiddenAvailableSeries() {
+  var available = seriesAvailability();
+  return SERIES_KEYS.some(function (k) { return available[k] && slotAssignment[k] < 0; }) && numSlots < MAX_SLOTS;
+}
+
+// "− Remove chart" button: drops the chart in the highest-index active slot.
+function activeSlotCount() {
+  var available = seriesAvailability();
+  var active = {};
+  SERIES_KEYS.forEach(function (k) { if (available[k] && slotAssignment[k] >= 0) active[slotAssignment[k]] = true; });
+  return Object.keys(active).map(Number);
+}
+
+function removeLastChart() {
+  var slots = activeSlotCount();
+  if (!slots.length) return;
+  clearSlot(Math.max.apply(null, slots));
+}
 
 // ── color mode helpers ────────────────────────────────────────────────────────
 function hexToRgba(hex, alpha) {
@@ -1440,24 +1522,63 @@ function renderDashboard() {
     activeSlotIndices = Object.keys(splitSlots).map(Number);
   }
 
-  // Refresh layout panel if open (availability may have changed)
-  if (layoutPanelOpen) renderLayoutPanel();
-
   activeSlotIndices.forEach(function (slotIdx) {
     var keys = slotSeries[slotIdx];
 
     // Create container + canvas
     var wrap = document.createElement('div');
-    wrap.style.cssText = 'flex:1;min-width:0;';
+    wrap.className = 'chart-wrap';
+
+    // Touch-first header: tap a chip to open the series picker, tap ×
+    // to clear the chart. Hidden during compare mode, where slots are
+    // auto-split per series and reassigning would conflict with that.
+    if (compareTripIdx == null) {
+      var header = document.createElement('div');
+      header.className = 'chart-slot-header';
+      keys.forEach(function (key) {
+        var chip = document.createElement('span');
+        chip.className = 'chart-y-chip';
+        chip.textContent = SERIES_LABEL[key];
+        chip.title = 'Tap to replace or add a series';
+        chip.addEventListener('click', function () { openSeriesPicker(slotIdx, key, chip); });
+        header.appendChild(chip);
+      });
+      var removeBtn = document.createElement('span');
+      removeBtn.className = 'chart-remove-btn';
+      removeBtn.textContent = '×';
+      removeBtn.title = 'Remove this chart';
+      removeBtn.addEventListener('click', function () { clearSlot(slotIdx); });
+      header.appendChild(removeBtn);
+      wrap.appendChild(header);
+    }
+
+    var canvasWrap = document.createElement('div');
+    canvasWrap.style.cssText = 'flex:1;min-height:0;position:relative;';
     var canvas = document.createElement('canvas');
     canvas.id = 'chart-slot-' + slotIdx;
-    wrap.appendChild(canvas);
+    canvasWrap.appendChild(canvas);
+    wrap.appendChild(canvasWrap);
+
+    // X axis label doubles as the distance/time toggle — no separate row.
+    var xLabelEl = document.createElement('div');
+    xLabelEl.className = 'chart-x-label';
+    xLabelEl.textContent = xLabel + ' ⇄';
+    xLabelEl.title = 'Tap to switch between distance and time';
+    xLabelEl.addEventListener('click', function () {
+      xMode = xMode === 'distance' ? 'time' : 'distance';
+      if (currentDetail) {
+        compareXs = compareDetail ? xValues(compareDetail) : null;
+        renderDashboard();
+      }
+    });
+    wrap.appendChild(xLabelEl);
+
     slotsEl.appendChild(wrap);
 
     // Build datasets: all Trip-A first, then all Trip-B (for clean cursor indexing)
     var datasetsA = [], datasetsB = [];
     var scales = {
-      x: { type: 'linear', title: { display: true, text: xLabel },
+      x: { type: 'linear', title: { display: false },
            min: 0, max: xMaxAll, ticks: { stepSize: step, precision: 0 } }
     };
 
@@ -1518,6 +1639,29 @@ function renderDashboard() {
 
     attachSlotListeners(canvas);
   });
+
+  // +/− chart buttons always sit right below the last chart (not a
+  // dashed placeholder tile that takes up chart space). Lives outside
+  // #dashboard-charts (which gets wiped above) so remove any stale one.
+  var staleControls = document.getElementById('chart-controls-row');
+  if (staleControls) staleControls.remove();
+  if (compareTripIdx == null) {
+    var controlsRow = document.createElement('div');
+    controlsRow.id = 'chart-controls-row';
+    var removeBtn2 = document.createElement('button');
+    removeBtn2.type = 'button';
+    removeBtn2.textContent = '− Remove chart';
+    removeBtn2.disabled = !activeSlotCount().length;
+    removeBtn2.addEventListener('click', removeLastChart);
+    var addBtn2 = document.createElement('button');
+    addBtn2.type = 'button';
+    addBtn2.textContent = '+ Add chart';
+    addBtn2.disabled = !hasHiddenAvailableSeries();
+    addBtn2.addEventListener('click', addNextHiddenSeries);
+    controlsRow.appendChild(removeBtn2);
+    controlsRow.appendChild(addBtn2);
+    slotsEl.parentElement.appendChild(controlsRow);
+  }
 
   updateDashboardStats();
   updateMapSelectionLayer();
@@ -1629,18 +1773,13 @@ function unselectTrip() {
 }
 
 // ── dashboard buttons ─────────────────────────────────────────────────────────
-document.getElementById('dashboard-xtoggle').addEventListener('click', function () {
-  xMode = xMode === 'distance' ? 'time' : 'distance';
-  this.textContent = 'X: ' + (xMode === 'distance' ? 'Distance' : 'Time');
-  if (currentDetail) {
-    compareXs = compareDetail ? xValues(compareDetail) : null;
-    renderDashboard();
-  }
-});
+// (X axis toggle now lives under each chart — see renderDashboard()'s
+// .chart-x-label — so there's no standalone toggle element to wire here.)
 
 document.getElementById('dashboard-compare').addEventListener('click', function () {
   if (comparePickMode) {
     exitComparePickMode();
+    document.getElementById('dashboard').classList.add('visible'); // cancelled — restore the dashboard
   } else if (segCompareMode) {
     segCompareMode = false;
     this.textContent = 'Compare';
@@ -1656,21 +1795,18 @@ document.getElementById('dashboard-compare').addEventListener('click', function 
   }
 });
 
-
-document.getElementById('dashboard-back').addEventListener('click', function () {
-  unselectTrip();
-  exitComparePickMode();
-  document.getElementById('dashboard').classList.remove('visible');
-  document.getElementById('trip-list-wrap').style.display = 'block';
-});
-
-document.getElementById('dashboard-close').addEventListener('click', function () {
+// Closing the dashboard no longer hides the nearby-trips list — it always
+// stays visible per the map-click flow (see showTripList()). The list is
+// the only "back" affordance needed now, so the separate "Back to list"
+// button was removed; tapping the same trip again also closes (see
+// showTripList()'s click handler).
+function closeDashboard() {
   document.getElementById('dashboard').classList.remove('visible');
   unselectTrip();
   exitComparePickMode();
-  if (clickCircle) { map.removeLayer(clickCircle); clickCircle = null; }
-  document.getElementById('trip-list-wrap').style.display = 'none';
-});
+}
+
+document.getElementById('dashboard-close').addEventListener('click', closeDashboard);
 
 // ── filters ───────────────────────────────────────────────────────────────────
 document.getElementById('show-tracks').addEventListener('change', function (e) {
