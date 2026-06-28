@@ -125,24 +125,31 @@
   #dashboard-mini-bar.visible { display: flex; }
   #dashboard-mini-bar .mini-bar-expand { color: #888; font-size: 12px; }
 
-  #dashboard-stats, #dashboard-stats-b {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-    gap: 4px 12px;
+  /* Stats area — one row per stat, columns: label | Trip A | Trip B (+ diff) */
+  #stats-area {
+    margin-top: 6px; padding-top: 6px; border-top: 1px solid #eee;
   }
-  .stat { display: flex; flex-direction: column; }
+  .stat-row {
+    display: grid; grid-template-columns: 100px 1fr 1fr;
+    align-items: center; gap: 2px 10px; padding: 3px 0;
+    border-bottom: 1px solid #f5f5f5;
+  }
+  #stats-area:not(.comparing) .stat-row { grid-template-columns: 100px 1fr; }
+  #stats-area:not(.comparing) .stat-val-b-wrap,
+  #stats-area:not(.comparing) #compare-col-b { display: none; }
+  #stats-header-row { display: none; border-bottom: none; }
+  #stats-area.comparing #stats-header-row { display: grid; }
+
   .stat-label { color: #777; font-size: 11px; }
   .stat-value { font-weight: bold; font-size: 14px; }
   .stat-value.ascent  { color: #c62828; }
   .stat-value.descent { color: #1565c0; }
   .stat-diff { font-size: 11px; font-weight: normal; color: #555; margin-left: 3px; }
 
-  /* Stats area — wraps A and B columns */
-  #stats-area {
-    margin-top: 6px; padding-top: 6px; border-top: 1px solid #eee;
-  }
-  /* Per-trip column */
+  /* Per-trip header cell (badge + trip name); doubles as the click target
+     to re-pick that slot's trip while comparing. */
   .compare-col {
+    display: flex; align-items: center;
     border-radius: 4px; padding: 4px 6px;
     border: 2px solid transparent; cursor: default;
     box-sizing: border-box;
@@ -150,11 +157,6 @@
   #stats-area.comparing .compare-col { cursor: pointer; }
   #stats-area.comparing .compare-col:hover { background: rgba(0,0,0,0.03); }
   #stats-area.comparing .compare-col.picking { background: #fff9c4; border-color: #f9a825; }
-  #compare-col-b { border-top: 1px solid #eee; margin-top: 2px; padding-top: 6px; }
-
-  /* Column header: badge + trip name */
-  .compare-col-header { display: none; align-items: center; margin-bottom: 6px; }
-  #stats-area.comparing .compare-col-header { display: flex; }
   .compare-badge {
     display: inline-flex; align-items: center; justify-content: center;
     width: 20px; height: 20px; border-radius: 3px;
@@ -198,6 +200,8 @@
   }
   .trip-list-item:hover { background: #f5f5f5; }
   .trip-list-item.compare-pick { padding-left: 4px; border-left: 3px solid #f9a825; }
+  .trip-list-item.compare-pick.current-pick { background: #fff3cd; font-weight: bold; }
+  .trip-list-item.compare-pick.current-pick:hover { background: #ffe9a8; }
 
   .drag-selecting, .drag-selecting * { cursor: crosshair !important; }
 
@@ -373,45 +377,30 @@
   <div id="dashboard-charts"></div>
 
   <div id="stats-area">
-    <div id="compare-col-a" class="compare-col">
-      <div id="stats-label-a" class="compare-col-header">
+    <div id="stats-header-row" class="stat-row">
+      <span class="stat-label"></span>
+      <span id="compare-col-a" class="compare-col">
         <span id="stats-badge-a" class="compare-badge">A</span>
         <span id="stats-label-a-main" class="compare-col-trip-name"></span>
-      </div>
-      <div id="dashboard-stats">
-        <div class="stat"><span class="stat-label">Distance</span><span id="stat-distance" class="stat-value">-</span></div>
-        <div class="stat"><span class="stat-label">Duration</span><span id="stat-duration" class="stat-value">-</span></div>
-        <div class="stat"><span class="stat-label">Max speed</span><span id="stat-max-speed" class="stat-value">-</span></div>
-        <div class="stat"><span class="stat-label">Avg speed</span><span id="stat-avg-speed" class="stat-value">-</span></div>
-        <div class="stat"><span class="stat-label">Moving avg</span><span id="stat-moving-speed" class="stat-value">-</span></div>
-        <div class="stat"><span class="stat-label">Stopped</span><span id="stat-stopped" class="stat-value">-</span></div>
-        <div class="stat"><span class="stat-label">Ascent</span><span id="stat-ascent" class="stat-value ascent">-</span></div>
-        <div class="stat"><span class="stat-label">Descent</span><span id="stat-descent" class="stat-value descent">-</span></div>
-        <div class="stat"><span class="stat-label">Min / Max ele</span><span id="stat-ele-range" class="stat-value">-</span></div>
-        <div class="stat" id="stat-hr-row" style="display:none"><span class="stat-label">Avg / Max HR</span><span id="stat-hr" class="stat-value">-</span></div>
-        <div class="stat" id="stat-cad-row" style="display:none"><span class="stat-label">Avg cadence</span><span id="stat-cad" class="stat-value">-</span></div>
-        <div class="stat" id="stat-pwr-row" style="display:none"><span class="stat-label">Avg power</span><span id="stat-pwr" class="stat-value">-</span></div>
-      </div>
-    </div>
-    <div id="compare-col-b" class="compare-col" style="display:none">
-      <div id="stats-label-b" class="compare-col-header">
+      </span>
+      <span id="compare-col-b" class="compare-col">
         <span id="stats-badge-b" class="compare-badge">B</span>
         <span id="stats-label-b-main" class="compare-col-trip-name"></span>
-      </div>
-      <div id="dashboard-stats-b">
-        <div class="stat"><span class="stat-label">Distance</span><span class="stat-value"><span id="stat-b-distance">-</span><span id="stat-b-distance-diff" class="stat-diff"></span></span></div>
-        <div class="stat"><span class="stat-label">Duration</span><span class="stat-value"><span id="stat-b-duration">-</span><span id="stat-b-duration-diff" class="stat-diff"></span></span></div>
-        <div class="stat"><span class="stat-label">Max speed</span><span class="stat-value"><span id="stat-b-max-speed">-</span><span id="stat-b-max-speed-diff" class="stat-diff"></span></span></div>
-        <div class="stat"><span class="stat-label">Avg speed</span><span class="stat-value"><span id="stat-b-avg-speed">-</span><span id="stat-b-avg-speed-diff" class="stat-diff"></span></span></div>
-        <div class="stat"><span class="stat-label">Moving avg</span><span class="stat-value"><span id="stat-b-moving-speed">-</span><span id="stat-b-moving-speed-diff" class="stat-diff"></span></span></div>
-        <div class="stat"><span class="stat-label">Stopped</span><span class="stat-value"><span id="stat-b-stopped">-</span><span id="stat-b-stopped-diff" class="stat-diff"></span></span></div>
-        <div class="stat"><span class="stat-label">Ascent</span><span class="stat-value ascent"><span id="stat-b-ascent">-</span><span id="stat-b-ascent-diff" class="stat-diff"></span></span></div>
-        <div class="stat"><span class="stat-label">Descent</span><span class="stat-value descent"><span id="stat-b-descent">-</span><span id="stat-b-descent-diff" class="stat-diff"></span></span></div>
-        <div class="stat"><span class="stat-label">Min / Max ele</span><span class="stat-value"><span id="stat-b-ele-range">-</span></span></div>
-        <div class="stat" id="stat-b-hr-row" style="display:none"><span class="stat-label">Avg / Max HR</span><span class="stat-value"><span id="stat-b-hr">-</span><span id="stat-b-hr-diff" class="stat-diff"></span></span></div>
-        <div class="stat" id="stat-b-cad-row" style="display:none"><span class="stat-label">Avg cadence</span><span class="stat-value"><span id="stat-b-cad">-</span><span id="stat-b-cad-diff" class="stat-diff"></span></span></div>
-        <div class="stat" id="stat-b-pwr-row" style="display:none"><span class="stat-label">Avg power</span><span class="stat-value"><span id="stat-b-pwr">-</span><span id="stat-b-pwr-diff" class="stat-diff"></span></span></div>
-      </div>
+      </span>
+    </div>
+    <div id="dashboard-stats">
+      <div class="stat-row"><span class="stat-label">Distance</span><span id="stat-distance" class="stat-value">-</span><span class="stat-value stat-val-b-wrap"><span id="stat-b-distance">-</span><span id="stat-b-distance-diff" class="stat-diff"></span></span></div>
+      <div class="stat-row"><span class="stat-label">Duration</span><span id="stat-duration" class="stat-value">-</span><span class="stat-value stat-val-b-wrap"><span id="stat-b-duration">-</span><span id="stat-b-duration-diff" class="stat-diff"></span></span></div>
+      <div class="stat-row"><span class="stat-label">Max speed</span><span id="stat-max-speed" class="stat-value">-</span><span class="stat-value stat-val-b-wrap"><span id="stat-b-max-speed">-</span><span id="stat-b-max-speed-diff" class="stat-diff"></span></span></div>
+      <div class="stat-row"><span class="stat-label">Avg speed</span><span id="stat-avg-speed" class="stat-value">-</span><span class="stat-value stat-val-b-wrap"><span id="stat-b-avg-speed">-</span><span id="stat-b-avg-speed-diff" class="stat-diff"></span></span></div>
+      <div class="stat-row"><span class="stat-label">Moving avg</span><span id="stat-moving-speed" class="stat-value">-</span><span class="stat-value stat-val-b-wrap"><span id="stat-b-moving-speed">-</span><span id="stat-b-moving-speed-diff" class="stat-diff"></span></span></div>
+      <div class="stat-row"><span class="stat-label">Stopped</span><span id="stat-stopped" class="stat-value">-</span><span class="stat-value stat-val-b-wrap"><span id="stat-b-stopped">-</span><span id="stat-b-stopped-diff" class="stat-diff"></span></span></div>
+      <div class="stat-row"><span class="stat-label">Ascent</span><span id="stat-ascent" class="stat-value ascent">-</span><span class="stat-value ascent stat-val-b-wrap"><span id="stat-b-ascent">-</span><span id="stat-b-ascent-diff" class="stat-diff"></span></span></div>
+      <div class="stat-row"><span class="stat-label">Descent</span><span id="stat-descent" class="stat-value descent">-</span><span class="stat-value descent stat-val-b-wrap"><span id="stat-b-descent">-</span><span id="stat-b-descent-diff" class="stat-diff"></span></span></div>
+      <div class="stat-row"><span class="stat-label">Min / Max ele</span><span id="stat-ele-range" class="stat-value">-</span><span class="stat-value stat-val-b-wrap"><span id="stat-b-ele-range">-</span></span></div>
+      <div class="stat-row" id="stat-hr-row" style="display:none"><span class="stat-label">Avg / Max HR</span><span id="stat-hr" class="stat-value">-</span><span class="stat-value stat-val-b-wrap"><span id="stat-b-hr">-</span><span id="stat-b-hr-diff" class="stat-diff"></span></span></div>
+      <div class="stat-row" id="stat-cad-row" style="display:none"><span class="stat-label">Avg cadence</span><span id="stat-cad" class="stat-value">-</span><span class="stat-value stat-val-b-wrap"><span id="stat-b-cad">-</span><span id="stat-b-cad-diff" class="stat-diff"></span></span></div>
+      <div class="stat-row" id="stat-pwr-row" style="display:none"><span class="stat-label">Avg power</span><span id="stat-pwr" class="stat-value">-</span><span class="stat-value stat-val-b-wrap"><span id="stat-b-pwr">-</span><span id="stat-b-pwr-diff" class="stat-diff"></span></span></div>
     </div>
   </div>
   </div>
@@ -621,6 +610,30 @@ function updateClickRadiusLabel() {
 }
 map.on('zoomend moveend', updateClickRadiusLabel);
 
+// Finds the densest cluster of GPS points: bins every point into a coarse
+// grid, picks the cell with the most points, and returns its center. Used
+// to zoom the mini preview to where trips actually concentrate (e.g. home
+// turf) rather than wherever the device's current GPS happens to be —
+// useful when opening the app away from home, on a trip, etc.
+var DENSE_GRID_DEG = 0.02; // ~2km cells
+function findDenseCenter(data) {
+  var counts = {};
+  for (var i = 0; i < data.length; i++) {
+    var coords = data[i];
+    for (var p = 0; p < coords.length; p++) {
+      var k = Math.round(coords[p][0] / DENSE_GRID_DEG) + '_' + Math.round(coords[p][1] / DENSE_GRID_DEG);
+      counts[k] = (counts[k] || 0) + 1;
+    }
+  }
+  var bestK = null, bestCount = 0;
+  for (var k in counts) {
+    if (counts[k] > bestCount) { bestCount = counts[k]; bestK = k; }
+  }
+  if (!bestK) return null;
+  var parts = bestK.split('_');
+  return { lat: parseInt(parts[0], 10) * DENSE_GRID_DEG, lon: parseInt(parts[1], 10) * DENSE_GRID_DEG };
+}
+
 // ── raw grid + radius click ───────────────────────────────────────────────────
 var RAW_GRID_DEG = 0.001;
 
@@ -679,22 +692,31 @@ function buildCurrentTripCells(idx) {
     currentTripCells.add(Math.floor(coords[i][0] / RAW_GRID_DEG) + '_' + Math.floor(coords[i][1] / RAW_GRID_DEG));
 }
 
+// Ranks candidate trips against the currently selected one: same sport
+// always ranks first (comparing across sports rarely makes sense), then —
+// per the requested priority — similar total distance outweighs route
+// overlap, with route overlap as the tie-breaker. Route overlap is the
+// *fraction* of the candidate's points that land in a grid cell the
+// current trip also visited, not a raw count, so a longer/denser trip
+// doesn't automatically outrank a short one that retraces the same path.
 function tripSimilarityScore(idx) {
-  var score = 0;
-  if (!currentTripCells || currentTripIdx == null) return score;
-  // Same sport
-  if (tripSport(idx) === tripSport(currentTripIdx)) score += 100;
-  // Similar total distance (ratio 0-1 → up to 50 pts)
+  if (currentTripIdx == null) return 0;
+  var sameSport = tripSport(idx) === tripSport(currentTripIdx);
+
   var da = tripMeta[currentTripIdx] ? tripMeta[currentTripIdx].distanceKm : 0;
   var db = tripMeta[idx].distanceKm;
-  if (da > 0 && db > 0) score += (Math.min(da, db) / Math.max(da, db)) * 50;
-  // Geographic overlap (1 pt per shared cell)
-  var coords = rawAll[idx];
-  for (var i = 0; i < coords.length; i++) {
-    var k = Math.floor(coords[i][0] / RAW_GRID_DEG) + '_' + Math.floor(coords[i][1] / RAW_GRID_DEG);
-    if (currentTripCells.has(k)) score += 1;
+  var distScore = (da > 0 && db > 0) ? (Math.min(da, db) / Math.max(da, db)) : 0; // 0..1
+
+  var coords = rawAll[idx], overlapCount = 0;
+  if (currentTripCells && coords.length) {
+    for (var i = 0; i < coords.length; i++) {
+      var k = Math.floor(coords[i][0] / RAW_GRID_DEG) + '_' + Math.floor(coords[i][1] / RAW_GRID_DEG);
+      if (currentTripCells.has(k)) overlapCount++;
+    }
   }
-  return score;
+  var overlapScore = coords.length ? overlapCount / coords.length : 0; // 0..1
+
+  return (sameSport ? 1000 : 0) + distScore * 100 + overlapScore * 50;
 }
 
 // ── trip list + comparison pick ───────────────────────────────────────────────
@@ -772,11 +794,18 @@ function showTripListForCompare(tripIdxs) {
     .map(function (idx) { return { idx: idx, score: tripSimilarityScore(idx) }; })
     .sort(function (a, b) { return b.score - a.score; });
 
+  // The trip already occupying the slot being replaced stays in the list
+  // (picking it again is harmless) but gets highlighted, so it's obvious
+  // at a glance instead of being selected again by mistake.
+  var ownSlotIdx = comparePickSlot === 'a' ? currentTripIdx : compareTripIdx;
+
   sorted.forEach(function (item) {
     var idx = item.idx, m = tripMeta[idx], div = document.createElement('div');
-    div.className = 'trip-list-item compare-pick';
+    var isCurrent = idx === ownSlotIdx;
+    div.className = 'trip-list-item compare-pick' + (isCurrent ? ' current-pick' : '');
     div.dataset.idx = idx;
-    div.textContent = m.date + ' — ' + m.distanceKm + ' km' + (m.sport ? ' — ' + m.sport : '');
+    div.textContent = m.date + ' — ' + m.distanceKm + ' km' + (m.sport ? ' — ' + m.sport : '') +
+      (isCurrent ? ' (current)' : '');
     div.addEventListener('click', function () { replaceCompareSlot(idx); });
     el.appendChild(div);
   });
@@ -960,7 +989,6 @@ function clearComparison() {
   if (compareCursorMarker)  { map.removeLayer(compareCursorMarker);  compareCursorMarker = null; }
   document.getElementById('stats-area').classList.remove('comparing');
   var colB = document.getElementById('compare-col-b');
-  colB.style.display = 'none';
   colB.classList.remove('picking');
   var colA = document.getElementById('compare-col-a');
   colA.onclick = null;
@@ -1004,7 +1032,6 @@ function updateCompareBar() {
 
   var colA = document.getElementById('compare-col-a');
   var colB = document.getElementById('compare-col-b');
-  colB.style.display = '';
   colA.onclick = function () { enterComparePickMode('a'); };
   colB.onclick = function () { enterComparePickMode('b'); };
 
@@ -1049,9 +1076,9 @@ function updateCompareBar() {
        sb.descent > 1 && sa.descent > 1 ? signedM(-sb.descent, -sa.descent) : '');
   document.getElementById('stat-b-ele-range').textContent =
     (sb.minEle != null && sb.maxEle != null) ? Math.round(sb.minEle) + ' / ' + Math.round(sb.maxEle) + ' m' : '-';
-  document.getElementById('stat-b-hr-row').style.display  = (sb.avgHr  != null || sa.avgHr  != null) ? '' : 'none';
-  document.getElementById('stat-b-cad-row').style.display = (sb.avgCad != null || sa.avgCad != null) ? '' : 'none';
-  document.getElementById('stat-b-pwr-row').style.display = (sb.avgPwr != null || sa.avgPwr != null) ? '' : 'none';
+  document.getElementById('stat-hr-row').style.display  = (sb.avgHr  != null || sa.avgHr  != null) ? '' : 'none';
+  document.getElementById('stat-cad-row').style.display = (sb.avgCad != null || sa.avgCad != null) ? '' : 'none';
+  document.getElementById('stat-pwr-row').style.display = (sb.avgPwr != null || sa.avgPwr != null) ? '' : 'none';
   setB('stat-b-hr',  sb.avgHr  != null ? sb.avgHr  + ' / ' + sb.maxHr  + ' bpm' : '-',
        sb.avgHr != null && sa.avgHr != null ? signedNum(sb.avgHr, sa.avgHr, 0, 'bpm') : '');
   setB('stat-b-cad', sb.avgCad != null ? sb.avgCad + ' rpm' : '-',
@@ -1070,7 +1097,9 @@ function destroyAllCharts() {
 function showDashboardMessage(text) {
   destroyAllCharts();
   currentDetail = null; currentXs = null; selStartIdx = null; selEndIdx = null;
-  document.querySelectorAll('#dashboard-stats .stat-value').forEach(function (el) { el.textContent = '-'; });
+  // :not(.stat-val-b-wrap) — that wrapper holds nested spans (stat-b-* value
+  // + diff); overwriting its textContent would delete those child elements.
+  document.querySelectorAll('#dashboard-stats .stat-value:not(.stat-val-b-wrap)').forEach(function (el) { el.textContent = '-'; });
   document.getElementById('dashboard-charts').style.display = 'none';
   var msg = document.getElementById('dashboard-message');
   msg.textContent = text; msg.style.display = 'block';
@@ -1390,7 +1419,6 @@ function updateDashboardStats() {
   var detail = currentDetail, si = selStartIdx, ei = selEndIdx;
   if (!detail || si == null || ei == null) return;
   var st = computeSelectionStats(detail, si, ei);
-  if (compareTripIdx != null) updateCompareBar();
   document.getElementById('stat-distance').textContent     = st.totalDistKm.toFixed(2) + ' km';
   document.getElementById('stat-duration').textContent     = formatDuration(st.totalDurS);
   document.getElementById('stat-max-speed').textContent    = st.maxSpd.toFixed(1) + ' km/h';
@@ -1407,6 +1435,9 @@ function updateDashboardStats() {
   if (st.avgHr  != null) document.getElementById('stat-hr').textContent  = st.avgHr + ' / ' + st.maxHr + ' bpm';
   if (st.avgCad != null) document.getElementById('stat-cad').textContent = st.avgCad + ' rpm';
   if (st.avgPwr != null) document.getElementById('stat-pwr').textContent = st.avgPwr + ' W';
+  // Runs after the Trip A values above so its row-visibility checks (which
+  // OR in Trip B's own HR/cadence/power presence) have the final say.
+  if (compareTripIdx != null) updateCompareBar();
 }
 
 function setSelection(startIdx, endIdx) {
@@ -1921,20 +1952,28 @@ function initApp(data) {
     setLoadingProgress('Rendering...', 0.8);
     setTimeout(function () {
       tracksLayer = new TracksCanvasLayer(); tracksLayer.addTo(map); raiseHighlightLayers();
-      if (MINI_MODE && !isNaN(MINI_LAT) && !isNaN(MINI_LON)) {
-        // Default to a 200x200km box centered on the device, but zoom in
-        // tighter to the trips' own bounds when all of them fit inside a
-        // smaller area.
-        var halfLat = 100 / 111; // ~111km per degree of latitude
-        var halfLon = 100 / (111 * Math.cos(MINI_LAT * Math.PI / 180));
-        var capBounds = L.latLngBounds(
-          [MINI_LAT - halfLat, MINI_LON - halfLon],
-          [MINI_LAT + halfLat, MINI_LON + halfLon]
-        );
-        if (bounds.isValid() && capBounds.contains(bounds)) {
+      if (MINI_MODE) {
+        // Default to a 200x200km box centered on where trips actually
+        // concentrate (falls back to the device's GPS position if there's
+        // no track data yet), but zoom in tighter to the trips' own bounds
+        // when all of them fit inside a smaller area.
+        var dense = findDenseCenter(rawAll);
+        var centerLat = dense ? dense.lat : MINI_LAT;
+        var centerLon = dense ? dense.lon : MINI_LON;
+        if (!isNaN(centerLat) && !isNaN(centerLon)) {
+          var halfLat = 100 / 111; // ~111km per degree of latitude
+          var halfLon = 100 / (111 * Math.cos(centerLat * Math.PI / 180));
+          var capBounds = L.latLngBounds(
+            [centerLat - halfLat, centerLon - halfLon],
+            [centerLat + halfLat, centerLon + halfLon]
+          );
+          if (bounds.isValid() && capBounds.contains(bounds)) {
+            map.fitBounds(bounds);
+          } else {
+            map.fitBounds(capBounds);
+          }
+        } else if (bounds.isValid()) {
           map.fitBounds(bounds);
-        } else {
-          map.fitBounds(capBounds);
         }
       } else if (bounds.isValid()) {
         map.fitBounds(bounds);
