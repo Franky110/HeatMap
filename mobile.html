@@ -8,6 +8,15 @@
 <style>
   html, body, #map { height: 100%; margin: 0; padding: 0; }
 
+  /* Mini mode — a tiny, non-interactive heatmap thumbnail embedded in the
+     Flutter home screen (see ?mini=1 handling below). Hides every control
+     and blocks input so it can't fight the page it's embedded in for
+     scroll/drag gestures. */
+  body.mini-mode #info, body.mini-mode #dashboard, body.mini-mode #dashboard-mini-bar,
+  body.mini-mode #segments-panel, body.mini-mode .leaflet-control,
+  body.mini-mode #loading-overlay { display: none !important; }
+  body.mini-mode #map { pointer-events: none; }
+
   #info {
     position: absolute; top: 10px; right: 10px; z-index: 1000;
     background: white; padding: 8px 12px; border-radius: 4px;
@@ -421,7 +430,24 @@
 <script>
 'use strict';
 
-var map = L.map('map', { preferCanvas: true });
+// Mini mode: ?mini=1&lat=..&lon=.. — used to embed a small, non-interactive
+// heatmap thumbnail centered on the device's location on the Flutter home
+// screen. See the body.mini-mode CSS rules and initApp()'s use of these.
+var _qs = new URLSearchParams(window.location.search);
+var MINI_MODE = _qs.get('mini') === '1';
+var MINI_LAT = parseFloat(_qs.get('lat'));
+var MINI_LON = parseFloat(_qs.get('lon'));
+if (MINI_MODE) document.body.classList.add('mini-mode');
+
+var map = L.map('map', { preferCanvas: true, zoomControl: !MINI_MODE, attributionControl: !MINI_MODE });
+if (MINI_MODE) {
+  map.dragging.disable();
+  map.scrollWheelZoom.disable();
+  map.doubleClickZoom.disable();
+  map.boxZoom.disable();
+  map.keyboard.disable();
+  if (map.tap) map.tap.disable();
+}
 var _baseLayers = {
   'OpenStreetMap': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
@@ -1895,7 +1921,11 @@ function initApp(data) {
     setLoadingProgress('Rendering...', 0.8);
     setTimeout(function () {
       tracksLayer = new TracksCanvasLayer(); tracksLayer.addTo(map); raiseHighlightLayers();
-      if (bounds.isValid()) map.fitBounds(bounds);
+      if (MINI_MODE && !isNaN(MINI_LAT) && !isNaN(MINI_LON)) {
+        map.setView([MINI_LAT, MINI_LON], 12);
+      } else if (bounds.isValid()) {
+        map.fitBounds(bounds);
+      }
       updateClickRadiusLabel();
       loadSegments(); renderSegMarkers();
       hideLoading();
