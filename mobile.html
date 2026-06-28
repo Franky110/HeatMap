@@ -103,6 +103,19 @@
   }
   .icon-close:hover { color: #c62828; }
 
+  /* Mini bar — replaces the full-screen dashboard while collapsed, so the
+     open trip's name stays visible (and tappable to re-expand) over the
+     map. */
+  #dashboard-mini-bar {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 1050;
+    background: white; box-shadow: 0 -1px 4px rgba(0,0,0,0.2);
+    font-family: sans-serif; font-size: 13px; font-weight: bold;
+    padding: 12px 16px; display: none; align-items: center;
+    justify-content: space-between; gap: 8px; cursor: pointer;
+  }
+  #dashboard-mini-bar.visible { display: flex; }
+  #dashboard-mini-bar .mini-bar-expand { color: #888; font-size: 12px; }
+
   #dashboard-stats, #dashboard-stats-b {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
@@ -342,6 +355,7 @@
     <strong id="dashboard-title">Trip details</strong>
     <div class="btn-group">
       <button id="dashboard-compare" type="button">Compare</button>
+      <button id="dashboard-collapse" type="button" class="icon-close" title="Show map" aria-label="Show map">&#9660;</button>
       <button id="dashboard-close" type="button" class="icon-close" title="Close" aria-label="Close">&times;</button>
     </div>
   </div>
@@ -392,6 +406,14 @@
     </div>
   </div>
   </div>
+</div>
+
+<!-- Shown instead of the full dashboard after tapping the collapse (▾)
+     button — keeps the open trip's name visible while the map is full
+     screen, and tapping it re-expands the dashboard. -->
+<div id="dashboard-mini-bar">
+  <span id="dashboard-mini-title"></span>
+  <span class="mini-bar-expand" title="Show details">&#9650;</span>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -810,6 +832,7 @@ function highlightTrip(idx) {
   currentTripIdx = idx;
   buildCurrentTripCells(idx);
   if (tracksLayer) tracksLayer.redraw(); // dim other tracks
+  document.getElementById('dashboard-mini-bar').classList.remove('visible');
   document.getElementById('dashboard').classList.add('visible');
   loadTripDetail(idx, function (detail) {
     if (!detail) { showDashboardMessage('No detail data. Rerun combine_trips.py to generate trip_details/.'); return; }
@@ -1153,19 +1176,6 @@ function hasHiddenAvailableSeries() {
   return SERIES_KEYS.some(function (k) { return available[k] && slotAssignment[k] < 0; }) && numSlots < MAX_SLOTS;
 }
 
-// "− Remove chart" button: drops the chart in the highest-index active slot.
-function activeSlotCount() {
-  var available = seriesAvailability();
-  var active = {};
-  SERIES_KEYS.forEach(function (k) { if (available[k] && slotAssignment[k] >= 0) active[slotAssignment[k]] = true; });
-  return Object.keys(active).map(Number);
-}
-
-function removeLastChart() {
-  var slots = activeSlotCount();
-  if (!slots.length) return;
-  clearSlot(Math.max.apply(null, slots));
-}
 
 // ── color mode helpers ────────────────────────────────────────────────────────
 function hexToRgba(hex, alpha) {
@@ -1646,21 +1656,21 @@ function renderDashboard() {
   var staleControls = document.getElementById('chart-controls-row');
   if (staleControls) staleControls.remove();
   if (compareTripIdx == null) {
+    // Only "+ Add chart" — removing a chart is already covered by the ×
+    // on each chart's own header, so a separate "Remove" button here
+    // would just be a redundant way to do the same thing.
     var controlsRow = document.createElement('div');
     controlsRow.id = 'chart-controls-row';
-    var removeBtn2 = document.createElement('button');
-    removeBtn2.type = 'button';
-    removeBtn2.textContent = '− Remove chart';
-    removeBtn2.disabled = !activeSlotCount().length;
-    removeBtn2.addEventListener('click', removeLastChart);
     var addBtn2 = document.createElement('button');
     addBtn2.type = 'button';
     addBtn2.textContent = '+ Add chart';
     addBtn2.disabled = !hasHiddenAvailableSeries();
     addBtn2.addEventListener('click', addNextHiddenSeries);
-    controlsRow.appendChild(removeBtn2);
     controlsRow.appendChild(addBtn2);
-    slotsEl.parentElement.appendChild(controlsRow);
+    // Insert right after the charts, before #stats-area — not appended
+    // at the end of #dashboard-body (which would land it below stats).
+    var statsArea = document.getElementById('stats-area');
+    slotsEl.parentElement.insertBefore(controlsRow, statsArea);
   }
 
   updateDashboardStats();
@@ -1802,11 +1812,29 @@ document.getElementById('dashboard-compare').addEventListener('click', function 
 // showTripList()'s click handler).
 function closeDashboard() {
   document.getElementById('dashboard').classList.remove('visible');
+  document.getElementById('dashboard-mini-bar').classList.remove('visible');
   unselectTrip();
   exitComparePickMode();
 }
 
 document.getElementById('dashboard-close').addEventListener('click', closeDashboard);
+
+// Collapse to the full map while keeping the open trip's name visible at
+// the bottom (tap it to come back) — distinct from Close, which drops the
+// trip entirely, and from Compare's auto-collapse while picking a 2nd trip.
+function collapseDashboardToMap() {
+  document.getElementById('dashboard').classList.remove('visible');
+  document.getElementById('dashboard-mini-title').textContent = document.getElementById('dashboard-title').textContent;
+  document.getElementById('dashboard-mini-bar').classList.add('visible');
+}
+
+function expandDashboardFromMap() {
+  document.getElementById('dashboard-mini-bar').classList.remove('visible');
+  document.getElementById('dashboard').classList.add('visible');
+}
+
+document.getElementById('dashboard-collapse').addEventListener('click', collapseDashboardToMap);
+document.getElementById('dashboard-mini-bar').addEventListener('click', expandDashboardFromMap);
 
 // ── filters ───────────────────────────────────────────────────────────────────
 document.getElementById('show-tracks').addEventListener('change', function (e) {
@@ -1826,6 +1854,7 @@ function initApp(data) {
   destroyAllCharts();
   currentTripIdx = null; currentDetail = null; currentTripCells = null;
   document.getElementById('dashboard').classList.remove('visible');
+  document.getElementById('dashboard-mini-bar').classList.remove('visible');
   document.getElementById('dashboard-message').style.display = 'none';
   document.getElementById('dashboard-charts').style.display = 'flex';
   if (tracksLayer) { map.removeLayer(tracksLayer); tracksLayer = null; }
