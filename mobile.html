@@ -61,10 +61,15 @@
      the distance/time toggle (no separate toggle row). */
   .chart-slot-header { display: flex; align-items: center; gap: 4px; margin-bottom: 2px; flex-wrap: wrap; }
   .chart-y-chip {
+    display: inline-flex; align-items: center; gap: 4px;
     font-size: 12px; padding: 3px 9px; border-radius: 10px; cursor: pointer;
     background: #eee; color: #333; border: 1px solid #ddd; user-select: none;
   }
   .chart-y-chip:active { background: #ddd; }
+  .chart-y-chip-remove {
+    cursor: pointer; color: #888; font-size: 13px; line-height: 1; padding: 0 1px;
+  }
+  .chart-y-chip-remove:hover { color: #c62828; }
   .chart-remove-btn {
     margin-left: auto; cursor: pointer; color: #999; font-size: 17px; line-height: 1;
     padding: 0 6px; user-select: none;
@@ -1160,6 +1165,15 @@ function addSeriesToSlot(slotIdx, newKey) {
   renderDashboard();
 }
 
+// Drops one series from a multi-series chart, leaving the others in place
+// (the chart's own × clears the whole slot — this is the per-chip
+// counterpart to "+ add", since until now a chip could only be replaced
+// or added to, never removed on its own).
+function removeSeriesFromSlot(key) {
+  slotAssignment[key] = -1;
+  renderDashboard();
+}
+
 function closeSeriesPicker() {
   var m = document.getElementById('series-picker');
   if (m) m.remove();
@@ -1605,9 +1619,24 @@ function renderDashboard() {
       keys.forEach(function (key) {
         var chip = document.createElement('span');
         chip.className = 'chart-y-chip';
-        chip.textContent = SERIES_LABEL[key];
-        chip.title = 'Tap to replace or add a series';
-        chip.addEventListener('click', function () { openSeriesPicker(slotIdx, key, chip); });
+        var chipLabel = document.createElement('span');
+        chipLabel.textContent = SERIES_LABEL[key];
+        chipLabel.title = 'Tap to replace or add a series';
+        chipLabel.addEventListener('click', function () { openSeriesPicker(slotIdx, key, chip); });
+        chip.appendChild(chipLabel);
+        // Only show a per-chip remove when this chart has more than one
+        // series — for a single series, the chart's own × already removes it.
+        if (keys.length > 1) {
+          var chipRemove = document.createElement('span');
+          chipRemove.className = 'chart-y-chip-remove';
+          chipRemove.textContent = '×';
+          chipRemove.title = 'Remove ' + SERIES_LABEL[key] + ' from this chart';
+          chipRemove.addEventListener('click', function (e) {
+            e.stopPropagation();
+            removeSeriesFromSlot(key);
+          });
+          chip.appendChild(chipRemove);
+        }
         header.appendChild(chip);
       });
       var removeBtn = document.createElement('span');
@@ -1952,28 +1981,28 @@ function initApp(data) {
     setLoadingProgress('Rendering...', 0.8);
     setTimeout(function () {
       tracksLayer = new TracksCanvasLayer(); tracksLayer.addTo(map); raiseHighlightLayers();
-      if (MINI_MODE) {
-        // Default to a 200x200km box centered on where trips actually
-        // concentrate (falls back to the device's GPS position if there's
-        // no track data yet), but zoom in tighter to the trips' own bounds
-        // when all of them fit inside a smaller area.
-        var dense = findDenseCenter(rawAll);
-        var centerLat = dense ? dense.lat : MINI_LAT;
-        var centerLon = dense ? dense.lon : MINI_LON;
-        if (!isNaN(centerLat) && !isNaN(centerLon)) {
-          var halfLat = 100 / 111; // ~111km per degree of latitude
-          var halfLon = 100 / (111 * Math.cos(centerLat * Math.PI / 180));
-          var capBounds = L.latLngBounds(
-            [centerLat - halfLat, centerLon - halfLon],
-            [centerLat + halfLat, centerLon + halfLon]
-          );
-          if (bounds.isValid() && capBounds.contains(bounds)) {
-            map.fitBounds(bounds);
-          } else {
-            map.fitBounds(capBounds);
-          }
-        } else if (bounds.isValid()) {
+      // Default to a 200x200km box centered on where trips actually
+      // concentrate — same view the home screen's mini preview uses —
+      // rather than fitting every trip's full extent, which zooms out to
+      // near-useless levels once trips span multiple regions/countries.
+      // In MINI_MODE, fall back to the device's GPS position if there's
+      // no track data yet; the full viewer just falls back to fitting
+      // everything in that case. Either way, zoom in tighter to the
+      // trips' own bounds when they all fit inside a smaller area.
+      var dense = findDenseCenter(rawAll);
+      var centerLat = dense ? dense.lat : (MINI_MODE ? MINI_LAT : NaN);
+      var centerLon = dense ? dense.lon : (MINI_MODE ? MINI_LON : NaN);
+      if (!isNaN(centerLat) && !isNaN(centerLon)) {
+        var halfLat = 100 / 111; // ~111km per degree of latitude
+        var halfLon = 100 / (111 * Math.cos(centerLat * Math.PI / 180));
+        var capBounds = L.latLngBounds(
+          [centerLat - halfLat, centerLon - halfLon],
+          [centerLat + halfLat, centerLon + halfLon]
+        );
+        if (bounds.isValid() && capBounds.contains(bounds)) {
           map.fitBounds(bounds);
+        } else {
+          map.fitBounds(capBounds);
         }
       } else if (bounds.isValid()) {
         map.fitBounds(bounds);
