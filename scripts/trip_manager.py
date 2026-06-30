@@ -82,7 +82,7 @@ def resolve_data_dir():
     messagebox.showinfo(
         "Choose a data folder",
         "Trip Manager keeps your personal data (GPX files, processed maps, "
-        "Komoot credentials) in a folder separate from the program.\n\n"
+        "Strava credentials) in a folder separate from the program.\n\n"
         "Choose or create a folder where this data will be stored."
     )
     while True:
@@ -304,9 +304,7 @@ class TripManager(tk.Tk):
         import_frame.pack(fill="x", padx=10, pady=(0, 6))
 
         _import_providers = [
-            ("Komoot",         "komoot", self.import_from_komoot),
-            ("Strava",         "strava", self.import_from_strava),
-            ("Garmin Connect", "garmin", self.import_from_garmin),
+            ("Strava", "strava", self.import_from_strava),
         ]
         self._auto_check_vars = {}
         _auto_cfg = load_config().get("auto_check", {})
@@ -594,16 +592,8 @@ class TripManager(tk.Tk):
                 "Make sure setup.bat has been run in the Trip Manager folder.",
             )
 
-    def import_from_komoot(self):
-        self._import_window("komoot_import", "KomootImportWindow",
-                            on_downloaded=self._prompt_process_new)
-
     def import_from_strava(self):
         self._import_window("strava_import", "StravaImportWindow",
-                            on_downloaded=self._prompt_process_new)
-
-    def import_from_garmin(self):
-        self._import_window("garmin_import", "GarminImportWindow",
                             on_downloaded=self._prompt_process_new)
 
     def _prompt_process_new(self, filenames):
@@ -632,9 +622,7 @@ class TripManager(tk.Tk):
         cfg = load_config()
         auto_cfg = cfg.get("auto_check", {})
         providers = [
-            ("komoot", "komoot_import", "KomootImportWindow"),
             ("strava", "strava_import", "StravaImportWindow"),
-            ("garmin", "garmin_import", "GarminImportWindow"),
         ]
         for key, module_name, class_name in providers:
             if not auto_cfg.get(key, False):

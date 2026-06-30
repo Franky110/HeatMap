@@ -32,25 +32,10 @@ except ImportError:  # headless / CI environment
     messagebox = None  # type: ignore
     _GUI_AVAILABLE = False
 
-# komootgpx is bundled at the project root in releases; in development it lives
-# as a sibling of the project root. Check project root first, then fall back.
-if os.path.isdir(os.path.join(_PROJECT_DIR, "komootgpx")):
-    if _PROJECT_DIR not in sys.path:
-        sys.path.insert(0, _PROJECT_DIR)
-else:
-    _parent = os.path.dirname(_PROJECT_DIR)
-    if _parent not in sys.path:
-        sys.path.insert(0, _parent)
-
-
 def _sanitize_filename(name: str) -> str:
-    """Wrapper that imports komootgpx lazily; falls back to basic sanitisation."""
-    try:
-        from komootgpx.utils import sanitize_filename
-        return sanitize_filename(name)
-    except ImportError:
-        import re
-        return re.sub(r'[\\/:*?"<>|]', '_', name)
+    """Replace characters that are illegal in filenames on Windows / macOS / Linux."""
+    import re
+    return re.sub(r'[\\/:*?"<>|]', '_', name)
 
 
 def _trip_manager_imports():

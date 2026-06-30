@@ -7,7 +7,7 @@ each trip's elevation, speed, heart rate, and cadence in an interactive dashboar
 ![Heatmap](docs/HeatMapHTML.png)
 
 ## Features
-- **Import** — download activities directly from Komoot, Strava, and Garmin, or add any GPX file
+- **Import** — download activities directly from Strava, or add any GPX file manually
 ![Import window](docs/HeatMapMainWindow.png)
 - **Heatmap** — all your trips overlaid on an interactive map (Leaflet + OpenStreetMap)
 ![Heatmap](docs/HeatMapHTML.png)
@@ -40,15 +40,13 @@ each trip's elevation, speed, heart rate, and cadence in an interactive dashboar
 2. Run `./setup.sh` once to create the Python environment
 3. Run `./trip_manager.sh` to launch
 
-> **Credential security:** On Windows, saved passwords are encrypted with DPAPI and bound to your user account. On macOS and Linux, they are stored as base64 in the credential file with permissions set to `600` (owner read/write only). Keep your data folder private.
+> **Credential security:** Your Strava OAuth token is stored locally. On Windows it is encrypted with DPAPI (bound to your user account). On macOS and Linux it is stored with permissions set to `600` (owner read/write only). Keep your data folder private.
 
 ## Importing trips
 
 | Source | How |
 |--------|-----|
-| **Komoot** | Click *Import from Komoot* — enter your credentials once, then select activities to download |
-| **Strava** | Click *Import from Strava* — follow the OAuth flow |
-| **Garmin** | Click *Import from Garmin* — enter credentials and select a date range |
+| **Strava** | Click *Import from Strava* — follow the OAuth flow in your browser |
 | **Any GPX** | Click *Add files…* or *Add folder…* in the trip list |
 
 After a download completes you will be prompted to process and visualize the new trips immediately.
@@ -111,9 +109,7 @@ LICENSE
 scripts/                — Python source (desktop app, all platforms)
   trip_manager.py       — main GUI (tkinter)
   combine_trips.py      — GPX parser and data builder
-  komoot_import.py      — Komoot downloader
   strava_import.py      — Strava downloader
-  garmin_import.py      — Garmin downloader
   data_wizard.py        — advanced data management
   dpapi_utils.py        — cross-platform credential encryption
   trip_utils.py         — shared GPX utilities

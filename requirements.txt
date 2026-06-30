@@ -2,6 +2,5 @@
 # (The Tkinter GUI, trip_manager.py, only needs the standard library + tkinter.)
 # combine_trips.py itself only uses the standard library — no extra packages needed.
 
-# Used by the Strava and Garmin Connect import windows.
+# Used by the Strava import window.
 requests==2.32.3
-garminconnect==0.2.24
