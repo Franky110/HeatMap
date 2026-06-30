@@ -11,3 +11,7 @@ TripManager.spec
 komoot_credentials.json
 .claude/
 .vs/
+
+# android_app is its own private git repo (github.com/Franky110/HeatMap-Android),
+# nested here on disk for local development convenience only.
+android_app/

@@ -70,7 +70,10 @@
     <li><a href="#viewing">4. Viewing the heatmap</a></li>
     <li><a href="#map-options">5. Heatmap page options</a></li>
     <li><a href="#dashboard">6. The trip dashboard</a></li>
-    <li><a href="#data-folder">7. Where your data is stored</a></li>
+    <li><a href="#segments">7. Segments</a></li>
+    <li><a href="#data-wizard">8. Data Wizard</a></li>
+    <li><a href="#android">9. Android companion app</a></li>
+    <li><a href="#data-folder">10. Where your data is stored</a></li>
   </ul>
 </div>
 
@@ -80,6 +83,8 @@
   Trip Manager is a set of files you can copy anywhere on your computer
   (e.g. a folder on your Desktop) — there is no traditional installer.
 </p>
+
+<h3>Windows</h3>
 <ol>
   <li>
     Double-click <strong>setup.bat</strong>. The first time it runs, it will:
@@ -99,9 +104,27 @@
     Desktop for convenience.
   </li>
 </ol>
+
+<h3>macOS / Linux</h3>
+<ol>
+  <li>
+    Make sure Python 3.9+ is installed.
+    On Linux you may also need: <code>sudo apt install python3-tk</code> (Debian/Ubuntu)
+    or the equivalent for your distro.
+  </li>
+  <li>Open a terminal in the Trip Manager folder and run:
+    <pre><code>./setup.sh</code></pre>
+    This creates the <code>env</code> virtual environment and installs the required packages.
+  </li>
+  <li>To launch the app:
+    <pre><code>./trip_manager.sh</code></pre>
+  </li>
+</ol>
+
 <div class="note">
   Setup only needs to be run once (or again after updating Trip Manager to a
-  new version). After that, just use <strong>Trip Manager.bat</strong> to launch it.
+  new version). After that, just use <strong>Trip Manager.bat</strong> (Windows) or
+  <code>./trip_manager.sh</code> (macOS/Linux) to launch it.
 </div>
 
 <h2 id="import">1. Importing data</h2>
@@ -113,6 +136,11 @@
   Use the import buttons in the top-left of the window. The first time you use
   a service you'll be asked for your login credentials. For Komoot these are
   stored encrypted on your computer and won't be asked again on the same PC.
+</p>
+<p>
+  When the download finishes, a dialog asks whether you want to process and
+  visualize the new trips straight away. Only the newly downloaded trips are
+  selected — existing processed data is untouched.
 </p>
 
 <h3>Add files manually</h3>
@@ -310,6 +338,9 @@
   <tr><td><strong>Ascent</strong></td><td>Total elevation gained (metres) within the selection.</td></tr>
   <tr><td><strong>Descent</strong></td><td>Total elevation lost (metres) within the selection.</td></tr>
   <tr><td><strong>Min / Max ele</strong></td><td>Lowest and highest elevation points within the selection.</td></tr>
+  <tr><td><strong>Avg HR / Max HR</strong></td><td>Average and peak heart rate within the selection (only shown when HR data is present).</td></tr>
+  <tr><td><strong>Avg cadence</strong></td><td>Average cadence (rpm) within the selection (only shown when cadence data is present).</td></tr>
+  <tr><td><strong>Avg power / Max power</strong></td><td>Average and peak power output in watts within the selection (only shown when power data is present — e.g. Garmin rides with a power meter).</td></tr>
 </table>
 
 <h3>Comparing two trips</h3>
@@ -322,7 +353,147 @@
   (now labelled "Cancel compare" or the button toggles off) to clear the comparison.
 </p>
 
-<h2 id="data-folder">7. Where your data is stored</h2>
+<h2 id="segments">7. Segments</h2>
+
+<p>
+  Segments let you define a named stretch of road or trail and instantly see a
+  leaderboard of every trip that has passed through it, ranked from fastest to
+  slowest — similar to Strava segments, but entirely local.
+</p>
+
+<h3>Creating a segment</h3>
+<ol>
+  <li>Click <strong>◆ Segments</strong> in the top-right of the heatmap page.</li>
+  <li>Click <strong>+ Create segment</strong> in the panel that opens.</li>
+  <li>Click the <strong>start point</strong> on the map — a green marker appears.</li>
+  <li>Click the <strong>end point</strong> on the map — a red marker appears.</li>
+  <li>Type a name for the segment and click <strong>Save</strong>.</li>
+</ol>
+<div class="note">
+  Segments are saved in your browser's local storage. They persist across page
+  reloads but are browser-specific — they won't transfer to another device or browser automatically.
+</div>
+
+<h3>Selecting a segment</h3>
+<p>
+  Click a segment card in the panel. The segment markers appear on the map and a
+  <strong>leaderboard</strong> opens below the card, listing every trip that passes
+  through the segment within an 80-metre match radius. Results are ranked by the
+  time taken to travel from the start point to the end point. Click any entry
+  in the leaderboard to open that trip's dashboard, with the chart selection
+  automatically snapped to the segment portion.
+</p>
+
+<h3>Segment operations</h3>
+<table>
+  <tr><th>Button</th><th>What it does</th></tr>
+  <tr><td><strong>Rename</strong></td><td>Change the segment's name.</td></tr>
+  <tr><td><strong>Reverse</strong></td><td>Swap start and end points — useful for a segment you also travel in the opposite direction.</td></tr>
+  <tr><td><strong>Copy</strong></td><td>Duplicate the segment (useful as a starting point for a slight variation).</td></tr>
+  <tr><td><strong>Delete</strong></td><td>Permanently remove the segment and its leaderboard.</td></tr>
+</table>
+
+<h3>Comparing two efforts on a segment</h3>
+<p>
+  With a segment selected and its leaderboard visible, click <strong>Compare</strong>
+  in the dashboard header. The leaderboard switches to "pick an effort" mode —
+  click any other entry to overlay that trip on the charts, with both efforts
+  aligned to the segment portion only. The compare bar below the charts shows
+  key stats for each effort side by side. Click <strong>Compare</strong> again to
+  exit comparison mode.
+</p>
+
+<h2 id="data-wizard">8. Data Wizard</h2>
+
+<p>
+  The Data Wizard is an advanced tool for inspecting and cleaning up your trip
+  library. Open it from the <strong>Data Wizard…</strong> button in the main
+  Trip Manager window.
+</p>
+
+<h3>The trip list</h3>
+<p>
+  The wizard shows every trip it finds in your data folder as a table with the
+  following columns:
+</p>
+<table>
+  <tr><th>Column</th><th>Meaning</th></tr>
+  <tr><td><strong>Date</strong></td><td>Date extracted from the filename (YYYY-MM-DD).</td></tr>
+  <tr><td><strong>Name</strong></td><td>The GPX filename.</td></tr>
+  <tr><td><strong>Sport</strong></td><td>Detected sport category (Bike, Run, Walking, …).</td></tr>
+  <tr><td><strong>Source</strong></td><td>Import source (garmin, komoot, strava, or blank for manually added files).</td></tr>
+  <tr><td><strong>Sensors</strong></td><td>Sensor data present in the raw GPX — any combination of <code>HR</code> (heart rate), <code>Cad</code> (cadence), <code>Pwr</code> (power), <code>Tmp</code> (temperature). Blank if no sensor data is recorded.</td></tr>
+  <tr><td><strong>Distance</strong></td><td>Total GPS track distance in km (from the raw GPX).</td></tr>
+  <tr><td><strong>Status</strong></td><td><em>Raw only</em> — GPX file present but not yet processed; <em>Processed only</em> — processed data exists but the raw GPX has been deleted; <em>Both</em> — both files present.</td></tr>
+</table>
+
+<h3>Filters</h3>
+<p>
+  Use the filter bar above the list to narrow down what is shown:
+  status, sport, date range, minimum distance, and a text search on the filename.
+  The count line below the filter bar shows how many trips are displayed vs. total.
+</p>
+
+<h3>Find duplicates</h3>
+<p>
+  Click <strong>Find duplicates</strong> to scan for trips that were imported
+  more than once. Two trips are considered duplicates when they share the same
+  date <em>and</em> their GPS distances are within 5% of each other. Duplicate
+  pairs are highlighted with distinct background colors so each pair is
+  immediately recognisable: pair 1 in yellow, pair 2 in green, pair 3 in blue,
+  and so on. A summary dialog lists the pairs found.
+</p>
+
+<h3>Deleting files</h3>
+<table>
+  <tr><th>Button</th><th>What it does</th></tr>
+  <tr><td><strong>Delete raw GPX</strong></td><td>Permanently deletes the raw <code>.gpx</code> file for selected trips that have one. Use this to free disk space once a trip is processed and you no longer need the original.</td></tr>
+  <tr><td><strong>Delete processed</strong></td><td>Removes the processed output for selected trips. The raw GPX is kept. Re-run processing to rebuild the output.</td></tr>
+</table>
+<div class="note">
+  Deletions are permanent. The Data Wizard does not have an undo function.
+  Use <strong>Find duplicates</strong> first to identify which copy to keep before deleting.
+</div>
+
+<h2 id="android">9. Android companion app</h2>
+
+<p>
+  The Android app lets you view your heatmap and dashboards on your phone.
+  It serves the same <code>combined.html</code> viewer over a local HTTP server
+  and displays it in an embedded browser — no internet connection required for
+  the map data itself (map tiles still need connectivity).
+</p>
+
+<h3>How it works</h3>
+<ol>
+  <li>Process your trips on the desktop as usual.</li>
+  <li>Transfer the <code>processed/</code> folder to your phone via USB:
+    <pre><code>Android / data / com.tripmanager.app / files / processed /</code></pre>
+    Copy <code>raw_data.js</code> and the <code>trip_details/</code> folder into that location.
+  </li>
+  <li>Open Trip Manager on your phone — it detects the data and shows an <strong>Open Heatmap</strong> button.</li>
+</ol>
+
+<div class="note">
+  On Android 11 and above, the <code>Android/data/</code> folder may be hidden from USB file managers.
+  Use <strong>adb</strong> to copy the files instead:<br>
+  <code>adb push processed/ /sdcard/Android/data/com.tripmanager.app/files/processed/</code>
+</div>
+
+<h3>Building and installing the app</h3>
+<p>
+  See <strong>android_app/README.md</strong> in the project folder for the full
+  build setup (Flutter SDK, Android Studio, emulator or physical device).
+  The short version:
+</p>
+<ol>
+  <li>Install Flutter and Android Studio.</li>
+  <li>Run <code>android_app/scripts/prepare_assets.bat</code> (Windows) or
+      <code>prepare_assets.sh</code> (macOS/Linux) to copy <code>combined.html</code> into the app assets.</li>
+  <li>Run <code>flutter pub get</code> then <code>flutter run</code> inside <code>android_app/</code>.</li>
+</ol>
+
+<h2 id="data-folder">10. Where your data is stored</h2>
 
 <p>
   The first time you run Trip Manager, it asks you to choose or create a
