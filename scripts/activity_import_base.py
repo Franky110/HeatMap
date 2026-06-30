@@ -12,12 +12,25 @@ import threading
 import http.server
 import urllib.parse
 import webbrowser
-import tkinter as tk
-from tkinter import ttk, messagebox
 from xml.sax.saxutils import escape
 
 _SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_DIR = os.path.dirname(_SCRIPTS_DIR)  # project root
+
+# ---------------------------------------------------------------------------
+# Optional GUI / external dependencies — imported lazily so that the pure
+# helper functions (normalize_sport, inject_gpx_metadata, etc.) can be
+# imported in unit tests without tkinter or komootgpx being installed.
+# ---------------------------------------------------------------------------
+try:
+    import tkinter as tk
+    from tkinter import ttk, messagebox
+    _GUI_AVAILABLE = True
+except ImportError:  # headless / CI environment
+    tk = None  # type: ignore
+    ttk = None  # type: ignore
+    messagebox = None  # type: ignore
+    _GUI_AVAILABLE = False
 
 # komootgpx is bundled at the project root in releases; in development it lives
 # as a sibling of the project root. Check project root first, then fall back.
@@ -29,9 +42,22 @@ else:
     if _parent not in sys.path:
         sys.path.insert(0, _parent)
 
-from komootgpx.utils import sanitize_filename
 
-from trip_manager import list_trips, trip_id, SOURCE_DIR, load_config, save_config
+def _sanitize_filename(name: str) -> str:
+    """Wrapper that imports komootgpx lazily; falls back to basic sanitisation."""
+    try:
+        from komootgpx.utils import sanitize_filename
+        return sanitize_filename(name)
+    except ImportError:
+        import re
+        return re.sub(r'[\\/:*?"<>|]', '_', name)
+
+
+def _trip_manager_imports():
+    """Return (list_trips, trip_id, SOURCE_DIR, load_config, save_config) from
+    trip_manager, imported on first call so the GUI dependency is deferred."""
+    from trip_manager import list_trips, trip_id, SOURCE_DIR, load_config, save_config
+    return list_trips, trip_id, SOURCE_DIR, load_config, save_config
 
 
 # ---------------------------------------------------------------------------
@@ -212,7 +238,7 @@ def build_gpx(name, points, start_time):
 # Common import window: filters, activity table, download buttons, log.
 # Subclasses provide the credentials UI and the provider-specific calls.
 # ---------------------------------------------------------------------------
-class ImportWindowBase(tk.Toplevel):
+class ImportWindowBase(tk.Toplevel if _GUI_AVAILABLE else object):
     PROVIDER = "Provider"
     PROVIDER_KEY = ""  # config key; set in each subclass (e.g. "komoot")
     # label -> value used to filter tour["type"]; {"All": "all"} disables the filter.
@@ -236,6 +262,7 @@ class ImportWindowBase(tk.Toplevel):
         self._build_progress_and_log()
 
         # Pre-fill with saved defaults
+        _, _, _, load_config, _ = _trip_manager_imports()
         self._apply_defaults(load_config().get("import_defaults", {}).get(self.PROVIDER_KEY, {}))
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
@@ -307,6 +334,7 @@ class ImportWindowBase(tk.Toplevel):
     def _save_defaults(self):
         if not self.PROVIDER_KEY:
             return
+        _, _, _, load_config, save_config = _trip_manager_imports()
         cfg = load_config()
         cfg.setdefault("import_defaults", {})[self.PROVIDER_KEY] = self._collect_defaults()
         save_config(cfg)
@@ -323,6 +351,7 @@ class ImportWindowBase(tk.Toplevel):
         If show_confirm is provided, it is called with (provider_name, [(tid, meta), ...])
         and must return the subset the user approved; download is skipped if None."""
         try:
+            list_trips, trip_id, SOURCE_DIR, load_config, save_config = _trip_manager_imports()
             defaults = load_config().get("import_defaults", {}).get(cls.PROVIDER_KEY, {})
             inst = object.__new__(cls)
             inst.import_hr_var  = _FakeVar(defaults.get('hr',  True))
@@ -390,7 +419,7 @@ class ImportWindowBase(tk.Toplevel):
 
     def activity_filename(self, tid, tour_meta):
         date_str = (tour_meta.get("date") or "")[:10]
-        name = sanitize_filename(tour_meta.get("name") or str(tid))
+        name = _sanitize_filename(tour_meta.get("name") or str(tid))
         return f"{date_str}_{name}-{tid}.gpx"
 
     # ----------------------------------------------------- data options
@@ -666,6 +695,7 @@ class ImportWindowBase(tk.Toplevel):
         self.progress.stop()
 
     def _on_fetched(self):
+        list_trips, trip_id, SOURCE_DIR, _, _ = _trip_manager_imports()
         self.existing_ids = {tid for tid in (trip_id(f) for f in list_trips()) if tid}
         self.new_tours = {
             tid: tour for tid, tour in self.all_tours.items()
@@ -765,6 +795,7 @@ class ImportWindowBase(tk.Toplevel):
         thread.start()
 
     def _download_thread(self, ids):
+        list_trips, trip_id, SOURCE_DIR, _, _ = _trip_manager_imports()
         downloaded_names = []
         existing_by_id = {trip_id(f): f for f in list_trips() if trip_id(f)}
         for tid in ids:
@@ -795,6 +826,7 @@ class ImportWindowBase(tk.Toplevel):
         self.after(0, self._download_done, ids, downloaded_names)
 
     def _download_done(self, ids, downloaded_names=None):
+        list_trips, trip_id, _, _, _ = _trip_manager_imports()
         for tid in ids:
             self.new_tours.pop(tid, None)
         self.existing_ids = {tid for tid in (trip_id(f) for f in list_trips()) if tid}
