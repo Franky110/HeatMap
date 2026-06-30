@@ -1001,11 +1001,6 @@ function clearComparison() {
   colA.classList.remove('picking');
 }
 
-function setCompareSlotActive(slot) {
-  // No-op — visual active state removed in favour of simpler click-to-replace.
-  // Keeping the function so existing callers don't break.
-}
-
 function updateCompareBar() {
   if (compareTripIdx == null || !compareDetail || !compareXs || currentTripIdx == null || !currentDetail || !currentXs) return;
   var ma = tripMeta[currentTripIdx], mb = tripMeta[compareTripIdx];

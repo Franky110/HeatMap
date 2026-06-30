@@ -59,13 +59,42 @@ After a download completes you will be prompted to process and visualize the new
 2. Click **Run processing** — this parses the GPX files and builds the map data
 3. Click **Open visualization** — your browser opens the heatmap
 
-## Dashboard layout
+## Heatmap viewer
 
-Click a trip on the map to open its dashboard. The **Layout ▾** button lets you:
-- Assign any series (speed, elevation, heart rate, cadence, power) to any chart slot
-- Combine two series in one slot (dual Y-axes) or split them into separate charts
-- Choose line, gradient fill, or value-gradient color per series
-- Toggle the X-axis between distance and time
+Open the heatmap from the main window (**Open visualization**). The viewer opens to the
+area of highest trip density automatically — no need to scroll to find your usual routes.
+
+### Selecting and comparing trips
+
+- **Click a trip line** to select it: the trip is highlighted and its stats appear on
+  the right. The trip list on the left scrolls to highlight the selected trip.
+- **Filter the trip list** by sport, date range, source (Komoot/Strava/Garmin), or sensor
+  data (HR, cadence, power) using the controls at the top of the list.
+- **Compare two trips** — click the **⊕** icon next to any trip in the list to add it as
+  "Trip B". Stats for both trips appear side-by-side: Distance | Trip A | Trip B (with diff).
+  Click the badge **A** or **B** in the stats panel to replace that slot with a different trip.
+  The trip picker sorts by similarity — same sport and closest distance match appear first,
+  with the currently-selected trip highlighted so you don't accidentally pick the same one.
+- **Clear comparison** with the **✕** next to the B badge.
+
+### Dashboard charts
+
+Charts appear below the stats when a trip is selected.
+
+- **Layout ▾** — choose which series each chart slot shows. Options: Elevation, Speed,
+  Heart Rate, Cadence, Power, Pace. Drag the slider on each series chip to stack or overlay.
+- **Dual Y-axis** — assign two series to one slot by clicking **+ Add** on a chart chip;
+  each axis uses its own scale. Remove one series with the **×** on its chip (the other stays).
+- **Clear a chart** with the **✕** button on the chart header.
+- **X-axis** — toggle between Distance and Time for all charts at once.
+- **Color mode** per series: plain line, gradient fill under the line, or speed-color gradient
+  (green = fast, red = slow).
+
+### Segment leaderboard
+
+Click **Segments** in the top menu to define a named stretch of road or trail.
+All trips that pass through it appear ranked fastest to slowest. Click any entry to
+load that trip's dashboard and compare it against the segment's best effort.
 
 ## Project structure
 
